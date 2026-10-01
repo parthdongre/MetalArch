@@ -37,6 +37,8 @@ void graph_tests(){
  Descriptor cyclic=a;cyclic.dependencies={"c"};expect_throw([&]{Graph x({cyclic,b,c});});
  expect_throw([&]{Graph x({a,a});});
  expect_throw([&]{Graph x({a,b,b});});
+ Descriptor source_dup=a;source_dup.id="dup_src";source_dup.sources={gold,gold};
+ expect_throw([&]{Graph x({source_dup});});
 }
 void ingestion_tests(){
  Store s;Event e=bar(gold,1,100);CHECK(s.ingest(e)==Ingest::Accepted);CHECK(s.version(gold)==1);
@@ -46,6 +48,13 @@ void ingestion_tests(){
  CHECK(s.ingest(bar(gold,2,-1))==Ingest::Invalid);
  CHECK(s.ingest(bar(gold,3,100))==Ingest::Accepted);CHECK(s.version(gold)==2);
  CHECK(s.ingest(bar(gold,2,100))==Ingest::OutOfOrder);
+ Descriptor raw{"raw","1","",{gold},{},0,[](const ReadView& view,const Results&){
+   Result r;r.status=Status::Valid;r.value=view.get(gold)->events.back().d;return r;
+ }};
+ Session causal(Graph({raw}));auto future=bar(gold,1,100);future.ingest_ns+=10'000'000'000LL;
+ CHECK(causal.store().ingest(future)==Ingest::Accepted);
+ CHECK(causal.execute(future.ingest_ns-1).at("raw").status==Status::Unavailable);
+ CHECK(causal.execute(future.ingest_ns).at("raw").status==Status::Valid);
  auto bad=bar(gold,4,101);bad.event_ns=T;CHECK(s.ingest(bad)==Ingest::OutOfOrder);
  auto f=depth(1);CHECK(s.ingest(f)==Ingest::Accepted);
  CHECK(s.ingest(depth(2,0,0))==Ingest::Accepted); // zero quantities allowed but engine unavailable
@@ -81,6 +90,15 @@ void core_tests(){
  const auto uncached=s.execute(T+71*STEP+3'000'000'000LL,false);
  const auto cached=s.execute(T+71*STEP+3'000'000'000LL,true);
  CHECK(normalized_result(uncached)==normalized_result(cached));
+ // A book-only update must not invalidate bar-only computations.
+ auto changed_book=depth(72,200,50);
+ changed_book.event_ns=T+71*STEP;changed_book.ingest_ns=T+71*STEP+4'000'000'000LL;
+ CHECK(s.store().ingest(changed_book)==Ingest::Accepted);
+ const auto changed=s.execute(changed_book.ingest_ns,true);
+ CHECK(changed.at("trend").identity==cached.at("trend").identity);
+ CHECK(changed.at("book_imbalance").identity!=cached.at("book_imbalance").identity);
+ CHECK(changed.at("fusion").identity!=cached.at("fusion").identity);
+ CHECK(std::abs(*changed.at("book_imbalance").value-0.6)<1e-12);
  // Source becomes stale even when signature is unchanged (TTL checked before cache hits).
  const auto stale=s.execute(T+71*STEP+200'000'000'000LL,true);
  CHECK(stale.at("trend").status==Status::Stale);CHECK(stale.at("book_imbalance").status==Status::Stale);

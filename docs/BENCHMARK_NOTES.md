@@ -8,11 +8,11 @@ Method: ten successive runs for each policy, 300 sequential timestamps, 3 events
 
 Latest diagnostic (after implementing declared source allowlist; see `benchmarks/local_smoke_2026-10-02.txt`):
 
-- B0 sequential full: median 9.136 ms over 10 runs (300 cuts x 2 evaluations), min 8.573 ms, max 10.084 ms; 64,400 compute invocations summed across runs; no cache hits.
-- B2 per-session cache: median 7.749 ms, min 7.307 ms, max 8.974 ms; 33,650 compute invocations and 30,750 cache hits summed across runs.
+- B0 sequential full: median 8.934 ms over 10 runs (300 cuts x 2 evaluations), min 8.617 ms, max 9.606 ms; 64400 compute invocations and 0 cache hits summed across runs.
+- B2 per-session cache: median 7.476 ms over 10 runs (300 cuts x 2 evaluations), min 7.335 ms, max 8.898 ms; 33650 compute invocations and 30750 cache hits summed across runs.
 - Diagnostic numeric sink = 1372.329 for both policies (rounded by presentation); correctness tests additionally compare normalized outputs exactly at shared input cuts.
 
-Acceptance evidence: Release-mode `metalarch_tests` passed 1,232 assertions spanning five test groups. Rebuilt and rerun AddressSanitizer and UndefinedBehaviorSanitizer (Debug) after the core read-allowlist and provenance changes. These tests are a starter suite, not a full correctness proof.
+Acceptance evidence: Release-mode `metalarch_tests` passed 1,241 assertions spanning five test groups. Rebuilt and rerun AddressSanitizer and UndefinedBehaviorSanitizer (Debug) after the core read-allowlist and provenance changes. These tests are a starter suite, not a full correctness proof.
 
 Recorded-input simulator (`fixtures/make_fixture.py`) generates `fixtures/synthetic_70.ma1`; two independent CLI replays should yield identical normalized text output with SHA-256 equality. See command examples in README. This is a fixture replay, not proof that a live market capture can be replayed faithfully.
 

@@ -1,9 +1,9 @@
 #include "metalarch/core.hpp"
 #include <algorithm>
-#include <bit>
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <locale>
 #include <queue>
 #include <set>
 #include <sstream>
@@ -12,7 +12,7 @@ namespace ma {
 namespace {
 constexpr uint64_t OFFSET=14695981039346656037ULL, PRIME=1099511628211ULL;
 void mix(uint64_t& h, uint64_t v) { for (int n=0;n<8;++n) {h ^= (v & 255U); h *= PRIME; v >>= 8U;} }
-void mix(uint64_t& h, const std::string& s) { mix(h, s.size()); for(unsigned char c:s){h^=c;h*=PRIME;} }
+void mix(uint64_t& h, const std::string& s) { mix(h, s.size()); for(char c:s){h^=static_cast<unsigned char>(c);h*=PRIME;} }
 std::vector<std::string> parts(const std::string& s) {
   std::vector<std::string> p; size_t start=0;
   for(size_t pos=0;pos<=s.size();++pos) if(pos==s.size()||s[pos]=='|') {p.push_back(s.substr(start,pos-start));start=pos+1;}
@@ -45,7 +45,7 @@ Ingest Store::ingest(const Event& e) {
   ++s.version;
   // Rolling source-content digest: version alone is not enough to identify traces.
   const auto encoded=encode_event(e);
-  for(unsigned char ch:encoded){s.digest^=ch;s.digest*=PRIME;}
+  for(char ch:encoded){s.digest^=static_cast<unsigned char>(ch);s.digest*=PRIME;}
   return Ingest::Accepted;
 }
 const Stream* Store::get(const Key& k) const {auto it=streams_.find(k);return it==streams_.end()?nullptr:&it->second;}
@@ -53,7 +53,8 @@ uint64_t Store::version(const Key& k) const {auto s=get(k);return s?s->version:0
 Graph::Graph(std::vector<Descriptor> specs) {
   std::map<std::string,Descriptor> by_id;
   for(auto& d:specs){
-    if(d.id.empty()||d.revision.empty()||!d.compute||d.max_source_age_ns<0||!by_id.emplace(d.id,std::move(d)).second)
+    const std::string id=d.id;
+    if(id.empty()||d.revision.empty()||!d.compute||d.max_source_age_ns<0||!by_id.emplace(id,std::move(d)).second)
       throw std::invalid_argument("invalid/duplicate engine descriptor");
   }
   std::map<std::string,std::vector<std::string>> adj;
@@ -100,7 +101,7 @@ Results Session::execute(int64_t now_ns,bool cache_enabled){
       const auto* stream=store_.get(k);
       if(!stream||stream->events.empty()){blocked=true;why="source unavailable";break;}
       const auto& ev=stream->events.back();
-      if(ev.event_ns>now_ns){blocked=true;why="source from future";break;}
+      if(ev.event_ns>now_ns || ev.ingest_ns>now_ns){blocked=true;why="source not available at evaluation time";break;}
       source_ns=std::min(source_ns,ev.event_ns);
       mode=std::max(mode,ev.mode);
       lineage.push_back(k.source+":"+k.symbol+":"+k.timeframe+":"+std::to_string(stream->version)+":"+std::to_string(stream->digest));
@@ -146,7 +147,7 @@ void Session::reset(){store_.reset();memo_.clear();hits_=computations_=0;}
 std::string name(Status s){switch(s){case Status::Valid:return "VALID";case Status::Stale:return "STALE";case Status::Unavailable:return "UNAVAILABLE";case Status::Failed:return "FAILED";}return "UNKNOWN";}
 std::string name(Mode s){switch(s){case Mode::Observed:return "OBSERVED";case Mode::Estimated:return "ESTIMATED";case Mode::Simulated:return "SIMULATED";}return "UNKNOWN";}
 std::string encode_event(const Event& e){
-  std::ostringstream ss;ss<<std::setprecision(std::numeric_limits<double>::max_digits10);
+  std::ostringstream ss;ss.imbue(std::locale::classic());ss<<std::setprecision(std::numeric_limits<double>::max_digits10);
   ss<<"MA1|"<<(e.key.kind==Kind::Bar?'B':'L')<<'|'<<e.key.source<<'|'<<e.key.symbol<<'|'<<e.key.timeframe<<'|'<<e.seq<<'|'<<e.event_ns<<'|'<<e.ingest_ns<<'|'<<e.a<<'|'<<e.b<<'|'<<e.c<<'|'<<e.d<<'|'<<e.e<<'|'<<static_cast<int>(e.mode);return ss.str();
 }
 Event decode_event(const std::string& line){
@@ -158,7 +159,7 @@ Event decode_event(const std::string& line){
   const auto m=parse_i(p[13]);if(m<0||m>2)throw std::invalid_argument("invalid mode");e.mode=static_cast<Mode>(m);return e;
 }
 std::string normalized_result(const Results& result){
-  std::ostringstream ss;ss<<std::setprecision(std::numeric_limits<double>::max_digits10);
+  std::ostringstream ss;ss.imbue(std::locale::classic());ss<<std::setprecision(std::numeric_limits<double>::max_digits10);
   for(const auto& [id,r]:result){ss<<id<<'|'<<name(r.status)<<'|'<<name(r.mode)<<'|';if(r.value)ss<<*r.value;
     ss<<'|'<<r.source_ns<<'|'<<r.identity<<'|'<<r.reason<<'\n';}
   return ss.str();
