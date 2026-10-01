@@ -19,6 +19,7 @@ The initial implementation must prioritize:
 6. A measured freshness-aware scheduling policy.
 
 **Design specification:** [docs/BLUEPRINT.md](docs/BLUEPRINT.md)  
+**Acceptance and benchmark protocol:** [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md)  
 **Legacy provenance and known issues:** [docs/LEGACY_AUDIT.md](docs/LEGACY_AUDIT.md)
 
 ## Research integrity
