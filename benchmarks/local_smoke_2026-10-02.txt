@@ -1,0 +1,2 @@
+B0 sequential-full n=10 events=300 twice/eval synthetic mode=Simulated median_ms=9.136 min_ms=8.573 max_ms=10.084 hits_total=0 computes_total=64400 sink=1372.329
+B2 session-cache n=10 events=300 twice/eval synthetic mode=Simulated median_ms=7.749 min_ms=7.307 max_ms=8.974 hits_total=30750 computes_total=33650 sink=1372.329

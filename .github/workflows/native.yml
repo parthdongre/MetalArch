@@ -1,0 +1,21 @@
+name: Native C++ core
+on:
+  push:
+  pull_request:
+jobs:
+  cpp20:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Configure sanitizers
+        run: cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DMETALARCH_SANITIZE=ON
+      - name: Build sanitizer tests
+        run: cmake --build build-sanitize --parallel 2
+      - name: Run sanitizer tests
+        run: ctest --test-dir build-sanitize --output-on-failure
