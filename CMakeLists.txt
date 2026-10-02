@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 option(METALARCH_SANITIZE "Enable ASan/UBSan on supported compilers" OFF)
 find_package(Threads REQUIRED)
-add_library(metalarch STATIC src/core.cpp src/resource.cpp src/engines.cpp src/legacy_extensions.cpp)
+add_library(metalarch STATIC src/core.cpp src/resource.cpp src/trace.cpp src/engines.cpp src/legacy_extensions.cpp)
 target_include_directories(metalarch PUBLIC include)
 target_link_libraries(metalarch PUBLIC Threads::Threads)
 target_compile_options(metalarch PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
@@ -13,6 +13,8 @@ if(METALARCH_SANITIZE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(metalarch PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
   target_link_options(metalarch PUBLIC -fsanitize=address,undefined)
 endif()
+add_executable(metalarch_trace src/trace_main.cpp)
+target_link_libraries(metalarch_trace PRIVATE metalarch)
 add_executable(metalarch_cli src/main.cpp)
 target_link_libraries(metalarch_cli PRIVATE metalarch)
 add_executable(metalarch_tests tests/test_core.cpp)
@@ -54,3 +56,34 @@ add_test(NAME metalarch_resource_tests COMMAND metalarch_resource_tests)
 add_test(NAME metalarch_session_profile_smoke COMMAND metalarch_profile_session
          ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/synthetic_70.ma1
          ${CMAKE_CURRENT_BINARY_DIR}/session-memory-smoke.csv expanded b2 8000000)
+add_executable(metalarch_trace_tests tests/test_trace.cpp)
+target_link_libraries(metalarch_trace_tests PRIVATE metalarch)
+add_test(NAME metalarch_trace_tests COMMAND metalarch_trace_tests
+         ${CMAKE_CURRENT_BINARY_DIR}/trace-scratch ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/synthetic_70.ma1
+         ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/m2_bundle/source_manifest.tsv)
+add_test(NAME metalarch_trace_verify_smoke COMMAND metalarch_trace verify
+         ${CMAKE_CURRENT_BINARY_DIR}/ci-packed.ma2)
+set_tests_properties(metalarch_trace_verify_smoke PROPERTIES DEPENDS metalarch_trace_pack_smoke)
+add_test(NAME metalarch_trace_pack_smoke COMMAND ${CMAKE_COMMAND}
+         -DTRACE_EXE=$<TARGET_FILE:metalarch_trace>
+         -DTRACE_INPUT=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/synthetic_70.ma1
+         -DTRACE_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/ci-packed.ma2
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/pack_smoke.cmake)
+add_test(NAME metalarch_trace_pack_replay_smoke COMMAND metalarch_cli replay
+         ${CMAKE_CURRENT_BINARY_DIR}/ci-packed.ma2 b2 8000000 expanded)
+set_tests_properties(metalarch_trace_pack_replay_smoke PROPERTIES DEPENDS metalarch_trace_pack_smoke)
+
+add_test(NAME metalarch_trace_bundle_smoke COMMAND ${CMAKE_COMMAND}
+         -DTRACE_EXE=$<TARGET_FILE:metalarch_trace>
+         -DTRACE_MANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/m2_bundle/source_manifest.tsv
+         -DTRACE_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/ci-bundle.ma2
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/bundle_smoke.cmake)
+add_test(NAME metalarch_trace_bundle_verify COMMAND ${CMAKE_COMMAND}
+         -DTRACE_EXE=$<TARGET_FILE:metalarch_trace>
+         -DTRACE_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/ci-bundle.ma2
+         -DTRACE_MANIFEST=${CMAKE_CURRENT_SOURCE_DIR}/fixtures/m2_bundle/source_manifest.tsv
+         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/verify_bundle.cmake)
+set_tests_properties(metalarch_trace_bundle_verify PROPERTIES DEPENDS metalarch_trace_bundle_smoke)
+add_test(NAME metalarch_trace_bundle_replay COMMAND metalarch_cli replay
+         ${CMAKE_CURRENT_BINARY_DIR}/ci-bundle.ma2 b2 8000000 expanded)
+set_tests_properties(metalarch_trace_bundle_replay PROPERTIES DEPENDS metalarch_trace_bundle_smoke)

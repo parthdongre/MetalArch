@@ -10,6 +10,19 @@ See the [100× capability expansion master plan](docs/ROADMAP_100X.md). It separ
 
 The [M1 implementation and evidence note](docs/IMPLEMENTATION_M1.md) documents opt-in engine wall/thread-CPU measurements, whole-process RSS and CPU metrics, B1 queue occupancy, lazily growing bounded event rings, and validated per-engine *frozen prior-trace calibration* for the P admission policy. Includes a standalone session-memory profiler to exclude the benchmark's retained B0 reference history, 10/10 local CTest targets under three toolchains/configurations, and a disjoint-calibration/held-out synthetic pilot. The [full 100× roadmap](docs/ROADMAP_100X.md) remains proposed beyond implemented milestones. **M1 does not yet enforce real CPU or RAM quotas or show P outperforming correct caching.**
 
+## M2 completed — validated recorded-source ingestion and MA2 replay
+
+[Implementation and threat model](docs/IMPLEMENTATION_M2.md) · [Synthetic three-stream source registry](fixtures/m2_bundle/source_manifest.tsv). M2 adds a strict one-source CSV adapter, bounded-memory k-way bundle recording for up to 256 independently declared bar/book streams, SHA-256-linked MA2 `E`/`D` event and duplicate audit rows, exclusive no-overwrite finalization, footer/root verification, optional independent root/manifest pinning, and replay into the existing native policies **without** rewriting the source as `fixture`. All included M2 example inputs are SIMULATED; any user-supplied OBSERVED flag and rights reference remain **unverified user declarations**. MA2 preserves MA1 compatibility and does not create a live exchange connection.
+
+```bash
+# Record and verify the three-stream synthetic fixture (choose an unused destination):
+./build/metalarch_trace record-bundle fixtures/m2_bundle/source_manifest.tsv build/demo.ma2 demo_bundle
+./build/metalarch_trace verify build/demo.ma2
+# Retain the printed root outside the recording, independently:
+./build/metalarch_trace verify build/demo.ma2 "$PINNED_ROOT" fixtures/m2_bundle/source_manifest.tsv
+./build/metalarch_cli replay build/demo.ma2 b2 8000000 expanded - "$PINNED_ROOT"
+```
+
 ## Implemented execution modes
 
 | Policy | Behaviour |
@@ -18,7 +31,7 @@ The [M1 implementation and evidence note](docs/IMPLEMENTATION_M1.md) documents o
 | B1 | Declared-DAG wave executor with persistent bounded worker pool; cheap waves execute serially to avoid excessive overhead |
 | B2 | Per-session source-version/parent-version cache with independent input/result age contracts |
 | B3 | Correct fixed cadence and separately disclosed last-known output when deferred |
-| P | Preliminary deadline-slack, dependency-closure, declared-cost-budget ready queue; research value still unverified |
+| P | Preliminary deadline-slack/dependency scheduling with declared costs or an explicit frozen, separately calibrated cost table; no hard CPU/memory quota |
 
 A typed `Descriptor` declares inputs, required parents, revision, parameters, source age, result age, cadence and nominal compute estimate. Missing dependencies, cycles and inconsistent descriptors fail early. Input keys include source, symbol, timeframe and kind. The ingestion store rejects non-finite/invalid events, sequence/time inversions, conflicting duplicates and invalid provenance modes, retains bounded history through a lazily growing O(1)-overwrite contiguous ring (maximum 4,096 events/stream by default), and exposes versioned rolling-content identity. Engines can read only declared sources. Downstream failures and provenance propagate explicitly. The source fingerprint uses a fast **non-cryptographic** digest; the manifest separately uses SHA-256 for artifact integrity. Ingest and evaluation must be serialized within one Session.
 

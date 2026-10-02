@@ -1,0 +1,72 @@
+{
+  "baseline_git_head": "c8408bb9f8390f8dee880386de8e0d7d67904284",
+  "cross_policy_replay": {
+    "cohorts": [
+      "core-11",
+      "expanded-19"
+    ],
+    "comparisons": 10,
+    "policies": [
+      "B0",
+      "B1",
+      "B2",
+      "B3",
+      "P"
+    ],
+    "same_binary_normalized_outputs_byte_identical": true
+  },
+  "date": "2026-10-02",
+  "fixture": {
+    "accepted": 210,
+    "audited_duplicates": 0,
+    "estimated": 0,
+    "ma2_file_sha256": "36317079a9bed0b1b93d2da395c6a0fd9b1601c4ade2647e228a4005d4a349e9",
+    "ma2_root_sha256": "ece7ba4e2aacf395c538a281900505881adc2bff0b879e35fb12986e3fcade95",
+    "observed": 0,
+    "original_ma1_sha256": "198507e26e86342476be6a8831601b69c79cb28f583d25ce9bb4800aa00e1972",
+    "simulated": 210,
+    "source_manifest_sha256": "45077e1e3377904de0b90e16f95ff7d98aedd833bb37cbac22da8988f5afd689"
+  },
+  "input_class": "SIMULATED",
+  "limits": [
+    "Input provenance and rights refs are user asserted, not validated with a provider",
+    "Hash chain is tamper evident relative to independently retained root, not a signature",
+    "Recorder is non-overwriting, not protected from later external filesystem mutation",
+    "No production real-time exchange adapter or observed market dataset is included",
+    "No P-scheduler gain, hard CPU quota or publication-ready live-feed claim"
+  ],
+  "local_test_matrix": {
+    "assertions": {
+      "core": 4723,
+      "legacy": 1668,
+      "m1": 63,
+      "m2": 935,
+      "total": 7389
+    },
+    "clang_release": "17/17 CTest targets passed",
+    "gcc_asan_ubsan": "17/17 CTest targets passed",
+    "gcc_release": "17/17 CTest targets passed"
+  },
+  "phase": "M2",
+  "protocol": "MA2-v1",
+  "source_sha256": {
+    ".github/workflows/native.yml": "cfe1fafd4e053ba5f30efef7fb80f8b6b7e8eb5873f1c329e2c89091b16d2155",
+    "CMakeLists.txt": "fa6646bb774997557bfd34e16533e58ce0ad04bd6cedc60915628d46592204fb",
+    "README.md": "a21b86c13b6f3f2024b4730af0240bf9bef12dec15d945843eae0068c5df2f32",
+    "docs/IMPLEMENTATION_M2.md": "4a9687dd61db5d9ecf0dbb5c192fde5deb6f52f5af957f37b39029cefd218b3a",
+    "fixtures/m2_bundle/gold_bars.csv": "166da326c34a8e0f4bfe302d0640bb720ffd4445ca3d35a7b6782cf5f094f1a4",
+    "fixtures/m2_bundle/gold_book.csv": "b186a0b87cb6a0702b4ae0cd6c30487d6ca1719851a18910c9a64197bff81552",
+    "fixtures/m2_bundle/silver_bars.csv": "fb695d6455f9d3ddc22c4d946ad35e577811f8acff36d82c5b509c3fa95a23e7",
+    "fixtures/m2_bundle/source_manifest.tsv": "45077e1e3377904de0b90e16f95ff7d98aedd833bb37cbac22da8988f5afd689",
+    "include/metalarch/trace.hpp": "81b06cbc268cb474e5e4e143294cba5e02783d56138ea6d11363b952717e489a",
+    "paper/METALARCH_DRAFT.md": "5eae88249829a433699ab0652450e8006e1ed40b88edd30243024e63f1000b53",
+    "src/main.cpp": "eb299055c9fed56deb5abc5667cfaf297aaf1703f1b65ec50a43bdecb041c681",
+    "src/trace.cpp": "3987110baba4123fa7779bd95fae6323528122ab4cbb4a4b67556d64305e8e13",
+    "src/trace_main.cpp": "14405203a9435c4ebf5ed2ce0995583fa79ea215f3d1bea334582889330ba0d7",
+    "tests/bundle_smoke.cmake": "a78c7d56c0aa334bbf7fe265f3d48af9b2f4911d81d769e09d36fc09456ffa7d",
+    "tests/pack_smoke.cmake": "9f89f4e8a123f5b969842645501bb3bf7521566b576085fbba071a7b99e4783b",
+    "tests/test_trace.cpp": "f13a701869229e519b72eb3861fe8c57c38907c6d3ccac3c3c11fa1aa79a3937",
+    "tests/verify_bundle.cmake": "6d39103667131b1985cd9b5bc06dc8339797ca363c46fb1e6f006fa80d9e001e"
+  },
+  "status": "ENGINEERING_VERIFICATION_ONLY_SYNTHETIC_INPUT_NOT_OBSERVED_FEED"
+}
