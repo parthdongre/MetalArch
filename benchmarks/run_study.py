@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ["CMakeLists.txt", "include/metalarch/core.hpp", "include/metalarch/resource.hpp", "include/metalarch/engines.hpp", "include/metalarch/legacy_extensions.hpp",
            "src/core.cpp", "src/resource.cpp", "src/engines.cpp", "src/legacy_extensions.cpp", "src/main.cpp", "benchmarks/compare.cpp", "benchmarks/calibrate.cpp",
-           "benchmarks/bench.cpp", "benchmarks/run_study.py",
+           "benchmarks/bench.cpp", "benchmarks/run_study.py", "tests/test_incremental.cpp",
            "benchmarks/run_budget_sweep.py", "benchmarks/run_m1_study.py", "benchmarks/plot_results.py", "fixtures/make_fixture.py", "tests/test_core.cpp", "tests/test_legacy.cpp", "tests/test_resource.cpp"]
 
 
@@ -48,8 +48,8 @@ def quantile(values: list[float], q: float) -> float:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run all five MetalArch diagnostic policies")
     parser.add_argument("--trace", type=Path, help="Existing MA1 trace (default: generate synthetic)")
-    parser.add_argument("--cohort", choices=("core", "expanded"), default="expanded",
-                        help="11-stage original native graph or 19-stage ASEP2-expanded workload")
+    parser.add_argument("--cohort", choices=("core", "expanded", "core-inc", "expanded-inc"), default="expanded",
+                        help="11/19-stage graphs, optionally with four source-indexed rolling kernels (-inc)")
     parser.add_argument("--bars", type=int, default=300)
     parser.add_argument("--warmup-bars", type=int, default=65)
     parser.add_argument("--runs", type=int, default=10)
@@ -135,7 +135,7 @@ def main() -> None:
         "git_head": capture("git", "rev-parse", "HEAD"),
         "git_dirty": capture("git", "status", "--porcelain"),
         "source_sha256": {name: sha256(ROOT / name) for name in SOURCES},
-        "cohort": args.cohort, "registered_stages": 19 if args.cohort=="expanded" else 11,
+        "cohort": args.cohort, "registered_stages": 19 if args.cohort.startswith("expanded") else 11,
         "trace_path": str(trace), "trace_sha256": sha256(trace),
         "csv_sha256": sha256(raw_path), "binary_sha256": sha256(exe),
         "engine_profile_csv_sha256": sha256(stage_path) if stage_path else None,

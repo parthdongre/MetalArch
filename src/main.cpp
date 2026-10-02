@@ -18,14 +18,15 @@ ma::Policy parse_policy(const std::string& s){
 }
 int main(int argc,char** argv){
  if(argc>=2 && std::string(argv[1])=="inventory"){
-   if(argc>3){std::cerr<<"usage: metalarch_cli inventory [core|expanded]\n";return 2;}
+   if(argc>3){std::cerr<<"usage: metalarch_cli inventory [core|expanded|core-inc|expanded-inc]\n";return 2;}
    const std::string cohort=argc==3?argv[2]:"expanded";
-   if(cohort!="core" && cohort!="expanded"){
-     std::cerr<<"cohort must be core or expanded\n";return 2;
+   if(cohort!="core" && cohort!="expanded" && cohort!="core-inc" && cohort!="expanded-inc"){
+     std::cerr<<"cohort must be core, expanded, core-inc or expanded-inc\n";return 2;
    }
    const ma::Key gold{"fixture","XAU","1m",ma::Kind::Bar}, silver{"fixture","XAG","1m",ma::Kind::Bar},
                  book{"fixture","XAU","live",ma::Kind::Book};
-   const auto graph=ma::make_metal_graph(gold,silver,book,cohort=="expanded");
+   const auto graph=ma::make_metal_graph(gold,silver,book,cohort=="expanded"||cohort=="expanded-inc",
+                                        cohort=="core-inc"||cohort=="expanded-inc");
    std::cout<<"id\trevision\tparameters\tinputs\tparents\tmax_source_age_ns\tmax_result_age_ns\tcadence\tdeclared_cost_ns\n";
    for(const auto& d:graph.sorted()){
      std::string sources,parents;
@@ -76,12 +77,15 @@ int main(int argc,char** argv){
 
  try{
    const std::string cohort=argc>=6?argv[5]:"expanded";
-   if(cohort!="core" && cohort!="expanded")throw std::invalid_argument("invalid cohort");
-   ma::Session session(ma::make_metal_graph(gold,silver,book,cohort=="expanded"));
+   if(cohort!="core" && cohort!="expanded" && cohort!="core-inc" && cohort!="expanded-inc")throw std::invalid_argument("invalid cohort");
+   const bool with_legacy=cohort=="expanded"||cohort=="expanded-inc";
+   const bool inc=cohort=="core-inc"||cohort=="expanded-inc";
+   const auto make_graph=[&](){return ma::make_metal_graph(gold,silver,book,with_legacy,inc);};
+   ma::Session session(make_graph());
    ma::PolicyOptions options;
    if(argc>=7 && std::string(argv[6])!="-"){
      if(std::string(argv[3])!="p")throw std::invalid_argument("frozen table is only used with P policy");
-     session.set_frozen_costs(ma::load_frozen_cost_table(argv[6],ma::make_metal_graph(gold,silver,book,cohort=="expanded")));
+     session.set_frozen_costs(ma::load_frozen_cost_table(argv[6],make_graph()));
      options.cost_model=ma::CostModel::FrozenCalibration;
    }
    std::ifstream input;

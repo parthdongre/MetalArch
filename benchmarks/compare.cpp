@@ -100,7 +100,7 @@ Sample inspect(const Results& got,const Results& oracle,const Graph& graph){
 int main(int argc,char** argv){
  try{
   if(argc<3||argc>9){
-    std::cerr<<"usage: metalarch_compare <input.ma1> <raw.csv> [runs=10] [warmup_bars=65] [P_budget_ns=8000000] [cohort=expanded|core] [profile=0|1] [frozen-cost-table.tsv]\n";
+    std::cerr<<"usage: metalarch_compare <input.ma1> <raw.csv> [runs=10] [warmup_bars=65] [P_budget_ns=8000000] [cohort=expanded|core|expanded-inc|core-inc] [profile=0|1] [frozen-cost-table.tsv]\n";
     return 2;
   }
   const auto trace=load(argv[1]);
@@ -111,8 +111,10 @@ int main(int argc,char** argv){
     throw std::invalid_argument("invalid runs/warmup/budget");
   const Key gold{"fixture","XAU","1m",Kind::Bar},silver{"fixture","XAG","1m",Kind::Bar},book{"fixture","XAU","live",Kind::Book};
   const std::string cohort=(argc>=7?argv[6]:"expanded");
-  if(cohort!="expanded" && cohort!="core")throw std::invalid_argument("cohort must be expanded or core");
-  const Graph graph=make_metal_graph(gold,silver,book,cohort=="expanded");
+  if(cohort!="expanded" && cohort!="core" && cohort!="expanded-inc" && cohort!="core-inc")
+    throw std::invalid_argument("cohort must be expanded, core, expanded-inc or core-inc");
+  const Graph graph=make_metal_graph(gold,silver,book,cohort=="expanded"||cohort=="expanded-inc",
+                                   cohort=="expanded-inc"||cohort=="core-inc");
   const bool profile=argc>=8?std::string(argv[7])=="1":false;
   if(argc>=8 && std::string(argv[7])!="0" && std::string(argv[7])!="1")throw std::invalid_argument("profile must be 0 or 1");
   const auto frozen=argc>=9?load_frozen_cost_table(argv[8],graph):std::map<std::string,uint64_t>{};

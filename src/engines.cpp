@@ -19,7 +19,7 @@ double ema(const EventWindow& v, size_t n){
 }
 double val(const Results& r,const std::string& id){return *r.at(id).value;}
 }
-Graph make_metal_graph(const Key& primary,const Key& peer,const Key& book,bool include_legacy){
+Graph make_metal_graph(const Key& primary,const Key& peer,const Key& book,bool include_legacy,bool use_incremental){
  constexpr int64_t BAR_TTL=120'000'000'000LL, BOOK_TTL=5'000'000'000LL;
  std::vector<Descriptor> d;
  d.push_back({"trend","ema-8-21-v1","fast=8;slow=21",{primary},{},BAR_TTL,[primary](const ReadView& s,const Results&){
@@ -103,8 +103,25 @@ Graph make_metal_graph(const Key& primary,const Key& peer,const Key& book,bool i
    else if(engine.id=="peer_corr") engine.estimated_cost_ns=2'000'000;
    else if(engine.id=="fusion") engine.estimated_cost_ns=1'000'000;
  }
+ if(use_incremental){
+   for(auto& engine:d)if(engine.id=="volatility"){
+     const auto reference=engine.compute;
+     engine.compute=[primary,reference](const ReadView& view,const Results& parents){
+       const auto* stream=view.get(primary);
+       if(stream && stream->events.size()>=21 && stream->recent20){
+         const auto& t=*stream->recent20;
+         if(t.full() && t.return_good==20 && std::isfinite(t.return_sq_sum))
+           return ready(std::sqrt(std::max(0.0,t.return_sq_sum/20.0)));
+       }
+       return reference(view,parents); // degenerate/unsupported arithmetic retains B0 semantics
+     };
+     engine.revision="realized-rms-recent20-v1";
+     engine.parameters+=";precompute=accepted-bars";
+     engine.requires_recent20=true;
+   }
+ }
  if(include_legacy){
-   auto extensions=make_legacy_extensions(primary);
+   auto extensions=make_legacy_extensions(primary,use_incremental);
    d.insert(d.end(),std::make_move_iterator(extensions.begin()),std::make_move_iterator(extensions.end()));
  }
  return Graph(std::move(d));

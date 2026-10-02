@@ -1,11 +1,13 @@
 #pragma once
 #include <cstdint>
 #include <algorithm>
+#include <array>
 #include <compare>
 #include <functional>
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -62,11 +64,26 @@ private:
   std::vector<Event> data_;
   size_t capacity_,head_{0};
 };
+// M3 opt-in, stream-owned feature index.  Each accepted bar contributes once;
+// these terms are shared across four independently registered engines.  The
+// rolling sums are advisory mathematical acceleration, not the B0 oracle.
+struct Recent20 {
+  struct Term {
+    double park{0}, gk{0}, return_sq{0}, illiq{0};
+    bool park_ok{false}, gk_ok{false}, return_ok{false}, illiq_ok{false};
+  };
+  std::array<Term,20> terms{};
+  size_t head{0}, count{0}, park_good{0}, gk_good{0}, return_good{0}, illiq_good{0};
+  double park_sum{0},gk_sum{0},return_sq_sum{0},illiq_sum{0};
+  void append(const Event& bar, const Event* previous);
+  bool full() const noexcept {return count==20;}
+};
 struct Stream {
   explicit Stream(size_t capacity=4096):events(capacity){}
   EventWindow events;
   uint64_t version{0};
   uint64_t digest{14695981039346656037ULL};
+  std::unique_ptr<Recent20> recent20; // null when not requested by descriptors
 };
 class Store {
 public:
@@ -74,9 +91,10 @@ public:
     if(max_events_per_stream<65) throw std::invalid_argument("history window must retain at least 65 events");
   }
   Ingest ingest(const Event& event);
+  void enable_recent20(const Key& key);
   const Stream* get(const Key& key) const;
   uint64_t version(const Key& key) const;
-  void reset() { streams_.clear(); }
+  void reset() { streams_.clear(); } // retain the graph's declared feature opt-ins
   size_t streams() const { return streams_.size(); }
   // Excludes map/string/allocator overhead; this is only the reserved contiguous
   // storage of Event slots, useful for comparing lazy vs eager ring reservation.
@@ -87,6 +105,7 @@ public:
   }
 private:
   std::map<Key, Stream> streams_;
+  std::set<Key> recent20_keys_;
   size_t max_events_;
 };
 class ReadView {
@@ -127,6 +146,7 @@ struct Descriptor {
   uint64_t estimated_cost_ns{1'000'000}; // deterministic calibration input, not an observed latency
   uint32_t cadence{1}; // 1 = always eligible; counted by evaluation cycles
   int64_t max_result_age_ns{0}; // 0 = no compute-age expiry
+  bool requires_recent20{false}; // opt-in, immutable per-source feature snapshot
 };
 enum class Policy : uint8_t { SequentialFull, ParallelFull, Cache, FixedCadence, Freshness };
 enum class CostModel : uint8_t { Declared, FrozenCalibration };

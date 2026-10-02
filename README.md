@@ -6,6 +6,15 @@
 
 See the [100× capability expansion master plan](docs/ROADMAP_100X.md). It separates the publication-critical constrained-resource system study from longer-term ASEP2 feature migration, UI, source adapters and optional research modules. Listed candidates are *not* completed implementations, demonstrated 100× speedups or established inventions.
 
+## M3 pilot — optional shared incremental OHLCV terms
+
+`core-inc` and `expanded-inc` are opt-in alternatives to the unchanged `core` and `expanded` graphs. A bounded, source-owned rolling 20-bar index lets **four** existing engines reuse validated price/volume terms (realized RMS volatility, Parkinson volatility, Garman–Klass volatility and Amihud illiquidity). The original direct-computation engine revisions remain the default B0 reference. The new CTest checks the first 5,200 bars and all five policies, and the historical MA1 replay of the default cohorts remains byte-identical to M2. This is **not a demonstrated end-to-end acceleration**: the five-run synthetic pilot has mixed results, including no B2-cache median improvement. Details and the 880-byte-per-enabled-stream index measurement are in [docs/IMPLEMENTATION_M3.md](docs/IMPLEMENTATION_M3.md).
+
+```bash
+./build/metalarch_cli inventory expanded-inc
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 b2 8000000 expanded-inc
+```
+
 ## Implemented M1 milestone — instrumented native resources
 
 The [M1 implementation and evidence note](docs/IMPLEMENTATION_M1.md) documents opt-in engine wall/thread-CPU measurements, whole-process RSS and CPU metrics, B1 queue occupancy, lazily growing bounded event rings, and validated per-engine *frozen prior-trace calibration* for the P admission policy. Includes a standalone session-memory profiler to exclude the benchmark's retained B0 reference history, 10/10 local CTest targets under three toolchains/configurations, and a disjoint-calibration/held-out synthetic pilot. The [full 100× roadmap](docs/ROADMAP_100X.md) remains proposed beyond implemented milestones. **M1 does not yet enforce real CPU or RAM quotas or show P outperforming correct caching.**

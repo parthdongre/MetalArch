@@ -13,7 +13,7 @@ Result missing(const char* reason){Result r;r.status=Status::Unavailable;r.reaso
 const EventWindow& history(const ReadView& view,const Key& key){return view.get(key)->events;}
 // The nonnegative source window and valid OHLC are enforced by Store::ingest.
 }
-std::vector<Descriptor> make_legacy_extensions(const Key& primary){
+std::vector<Descriptor> make_legacy_extensions(const Key& primary,bool use_incremental){
   std::vector<Descriptor> out;
   out.reserve(8);
   // ASEP2 oscillator_bank: percentage close-to-close rate of change, 12 bars.
@@ -124,6 +124,45 @@ std::vector<Descriptor> make_legacy_extensions(const Key& primary){
       }
       return valid(std::max(positive,negative));
     }});
+  if(use_incremental){
+    for(auto& engine:out){
+      const auto reference=engine.compute;
+      if(engine.id=="parkinson20"){
+        engine.compute=[primary,reference](const ReadView& view,const Results& parents){
+          const auto* stream=view.get(primary);
+          if(stream && stream->events.size()>=20 && stream->recent20){
+            const auto& t=*stream->recent20;
+            if(t.full()&&t.park_good==20&&std::isfinite(t.park_sum))
+              return valid(std::sqrt(std::max(0.0,t.park_sum/(20.0*4.0*std::numbers::ln2_v<double>))));
+          }
+          return reference(view,parents);
+        };
+      }else if(engine.id=="garman_klass20"){
+        engine.compute=[primary,reference](const ReadView& view,const Results& parents){
+          const auto* stream=view.get(primary);
+          if(stream && stream->events.size()>=20 && stream->recent20){
+            const auto& t=*stream->recent20;
+            if(t.full()&&t.gk_good==20&&std::isfinite(t.gk_sum))
+              return valid(std::sqrt(std::max(0.0,t.gk_sum/20.0)));
+          }
+          return reference(view,parents);
+        };
+      }else if(engine.id=="amihud20"){
+        engine.compute=[primary,reference](const ReadView& view,const Results& parents){
+          const auto* stream=view.get(primary);
+          if(stream && stream->events.size()>=21 && stream->recent20){
+            const auto& t=*stream->recent20;
+            if(t.full()&&t.illiq_good==20&&std::isfinite(t.illiq_sum))
+              return valid(t.illiq_sum/20.0);
+          }
+          return reference(view,parents);
+        };
+      }else continue;
+      engine.revision+="-recent20-v1";
+      engine.parameters+=";precompute=accepted-bars";
+      engine.requires_recent20=true;
+    }
+  }
   return out;
 }
 }

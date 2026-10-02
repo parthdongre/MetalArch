@@ -1,5 +1,6 @@
 #include "metalarch/core.hpp"
 #include <algorithm>
+#include <numbers>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
@@ -79,8 +80,61 @@ private:
   bool stopping_{false};
   size_t queue_highwater_{0};
 };
-Session::Session(Graph graph):graph_(std::move(graph)){}
+Session::Session(Graph graph):graph_(std::move(graph)){
+  for(const auto& d:graph_.sorted())if(d.requires_recent20){
+    for(const auto& key:d.sources)store_.enable_recent20(key);
+  }
+}
 Session::~Session()=default;
+void Recent20::append(const Event& bar,const Event* previous){
+  if(bar.key.kind!=Kind::Bar)throw std::invalid_argument("Recent20 requires OHLCV bars");
+  Term t;
+  const double hl=std::log(bar.b/bar.c);
+  const double co=std::log(bar.d/bar.a);
+  t.park=hl*hl;
+  t.gk=0.5*t.park-(2.0*std::numbers::ln2_v<double>-1.0)*co*co;
+  t.park_ok=std::isfinite(t.park);
+  t.gk_ok=std::isfinite(t.gk);
+  if(!t.park_ok)t.park=0;
+  if(!t.gk_ok)t.gk=0;
+  if(previous){
+    const double lr=std::log(bar.d/previous->d);
+    t.return_sq=lr*lr;
+    t.return_ok=std::isfinite(t.return_sq);
+    if(!t.return_ok)t.return_sq=0;
+    if(bar.e>0){
+      t.illiq=std::abs(lr)/(bar.d*bar.e);
+      t.illiq_ok=std::isfinite(t.illiq);
+      if(!t.illiq_ok)t.illiq=0;
+    }
+  }
+  const auto update=[this](const Term& x,bool add){
+    const double sign=add?1.0:-1.0;
+    park_sum+=sign*x.park;gk_sum+=sign*x.gk;
+    return_sq_sum+=sign*x.return_sq;illiq_sum+=sign*x.illiq;
+    if(x.park_ok)park_good=add?park_good+1:park_good-1;
+    if(x.gk_ok)gk_good=add?gk_good+1:gk_good-1;
+    if(x.return_ok)return_good=add?return_good+1:return_good-1;
+    if(x.illiq_ok)illiq_good=add?illiq_good+1:illiq_good-1;
+  };
+  if(full())update(terms[head],false);
+  else ++count;
+  terms[head]=t;
+  head=(head+1)%terms.size();
+  update(t,true);
+}
+void Store::enable_recent20(const Key& key){
+  if(key.kind!=Kind::Bar)throw std::invalid_argument("Recent20 requires bar key");
+  if(!recent20_keys_.insert(key).second)return;
+  auto it=streams_.find(key);
+  if(it==streams_.end())return;
+  auto& stream=it->second;
+  stream.recent20=std::make_unique<Recent20>();
+  for(size_t i=0;i<stream.events.size();++i){
+    const Event* previous=i?&stream.events[i-1]:nullptr;
+    stream.recent20->append(stream.events[i],previous);
+  }
+}
 void Session::set_frozen_costs(const std::map<std::string,uint64_t>& costs){
   if(costs.size()!=graph_.sorted().size())
     throw std::invalid_argument("calibration must cover every registered engine");
@@ -112,6 +166,13 @@ Ingest Store::ingest(const Event& e) {
     if(e.seq<prev.seq || e.event_ns<prev.event_ns || e.ingest_ns<prev.ingest_ns) return Ingest::OutOfOrder;
   }
   s.events.push(e);
+  if(recent20_keys_.contains(e.key)){
+    if(!s.recent20)s.recent20=std::make_unique<Recent20>();
+    // Minimum Store capacity is 65, so the previous bar cannot be the
+    // overwritten oldest entry.  Resolve it *after* any vector growth.
+    const Event* previous=s.events.size()>1?&s.events[s.events.size()-2]:nullptr;
+    s.recent20->append(e,previous);
+  }
   ++s.version;
   // Rolling source-content digest: version alone is not enough to identify traces.
   const auto encoded=encode_event(e);
@@ -150,6 +211,9 @@ Graph::Graph(std::vector<Descriptor> specs) {
 }
 uint64_t fingerprint(const Descriptor& d,const Store& s,const Results& parents){
   uint64_t h=OFFSET;mix(h,d.id);mix(h,d.revision);mix(h,d.parameters);mix(h,static_cast<uint64_t>(d.max_source_age_ns));mix(h,static_cast<uint64_t>(d.max_result_age_ns));
+  // The opt-in kernels have independent revision/parameter strings.  Do not
+  // perturb baseline fingerprints: MA1/MA2 historical B0-B3/P replay IDs
+  // must remain byte-identical for the unmodified reference graph.
   for(const auto& k:d.sources){mix(h,k.source);mix(h,k.symbol);mix(h,k.timeframe);mix(h,static_cast<uint64_t>(k.kind));mix(h,s.version(k));
     if(const auto* stream=s.get(k))mix(h,stream->digest);}
   for(const auto& id:d.dependencies){

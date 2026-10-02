@@ -58,6 +58,10 @@ add_test(NAME metalarch_session_profile_smoke COMMAND metalarch_profile_session
          ${CMAKE_CURRENT_BINARY_DIR}/session-memory-smoke.csv expanded b2 8000000)
 add_executable(metalarch_trace_tests tests/test_trace.cpp)
 target_link_libraries(metalarch_trace_tests PRIVATE metalarch)
+add_executable(metalarch_incremental_tests tests/test_incremental.cpp)
+target_link_libraries(metalarch_incremental_tests PRIVATE metalarch)
+add_test(NAME metalarch_incremental_tests COMMAND metalarch_incremental_tests
+         ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/synthetic_70.ma1)
 add_test(NAME metalarch_trace_tests COMMAND metalarch_trace_tests
          ${CMAKE_CURRENT_BINARY_DIR}/trace-scratch ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/synthetic_70.ma1
          ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/m2_bundle/source_manifest.tsv)
