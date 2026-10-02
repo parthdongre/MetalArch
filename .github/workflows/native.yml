@@ -1,0 +1,71 @@
+name: Native C++ core
+on:
+  push:
+  pull_request:
+jobs:
+  cpp20:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: g++
+            sanitize: true
+          - os: ubuntu-latest
+            compiler: clang++
+            sanitize: true
+          - os: macos-latest
+            compiler: clang++
+            sanitize: false
+    runs-on: ${{ matrix.os }}
+    env:
+      CXX: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Test native core, policy comparison and replay
+        run: ctest --test-dir build --output-on-failure
+      - name: Repeated deterministic scheduler replay
+        shell: bash
+        run: |
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > first.txt
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > second.txt
+          cmp first.txt second.txt
+      - name: Frozen calibration reproducibility
+        shell: bash
+        run: |
+          ./build/metalarch_calibrate fixtures/synthetic_70.ma1 build/ci-frozen.tsv expanded 195 5
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 expanded build/ci-frozen.tsv > frozen1.txt
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 expanded build/ci-frozen.tsv > frozen2.txt
+          cmp frozen1.txt frozen2.txt
+      - name: MA2 source integrity and MA1 equivalence (both engine cohorts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./build/metalarch_trace verify build/ci-bundle.ma2 > ma2-integrity.txt
+          root=$(sed 's/.*root_sha256=//' ma2-integrity.txt)
+          ./build/metalarch_trace verify build/ci-bundle.ma2 "$root" fixtures/m2_bundle/source_manifest.tsv
+          for cohort in core expanded; do
+            for policy in b0 b1 b2 b3 p; do
+              ./build/metalarch_cli replay fixtures/synthetic_70.ma1 "$policy" 8000000 "$cohort" > baseline.out
+              ./build/metalarch_cli replay build/ci-bundle.ma2 "$policy" 8000000 "$cohort" - "$root" > recorded.out
+              cmp baseline.out recorded.out
+            done
+          done
+          if ./build/metalarch_cli replay build/ci-bundle.ma2 b2 8000000 expanded - "0000000000000000000000000000000000000000000000000000000000000000" > badroot.out 2>/dev/null; then
+            echo "ERROR: incorrect pinned root was accepted"
+            exit 1
+          fi
+          test ! -s badroot.out
+      - name: Configure sanitizers
+        if: matrix.sanitize
+        run: cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DMETALARCH_SANITIZE=ON
+      - name: Build sanitizer tests
+        if: matrix.sanitize
+        run: cmake --build build-sanitize --parallel 2
+      - name: Run sanitizer tests
+        if: matrix.sanitize
+        run: ctest --test-dir build-sanitize --output-on-failure

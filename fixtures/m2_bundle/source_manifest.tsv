@@ -1,0 +1,4 @@
+source	symbol	timeframe	kind	mode	csv_path	rights_ref
+fixture	XAU	1m	bar	simulated	gold_bars.csv	synthetic.fixture
+fixture	XAG	1m	bar	simulated	silver_bars.csv	synthetic.fixture
+fixture	XAU	live	book	simulated	gold_book.csv	synthetic.fixture

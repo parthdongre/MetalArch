@@ -1,0 +1,386 @@
+{
+  "status": "SYNTHETIC_DISJOINT_TRACE_M1_DIAGNOSTIC_NOT_PAPER_FINDING",
+  "timestamp_utc": "2026-10-02T13:31:19.763244+00:00",
+  "source_validation": "calibration and evaluation are distinct, nonoverlapping deterministic simulated index ranges",
+  "calibration_indices": [
+    1,
+    150
+  ],
+  "evaluation_indices": [
+    2001,
+    2220
+  ],
+  "calibration_trace_sha256": "24e4357f66061ae2788222200c7d47b4d6d94f48a0b407a3f3ccbe153b7e4c90",
+  "evaluation_trace_sha256": "2b843c506b5255026962b75db2a6433fcf48edae547c1d3ae7fa9de91967180b",
+  "frozen_cost_table_sha256": "954e5a0f57442f68db28dca70211f8ebfec0ce498f5d0364119050cd3b1c7b4e",
+  "cohort": "expanded",
+  "stages": 19,
+  "frozen_cost_total_ns": 23051,
+  "frozen_budget_ns": 14983,
+  "declared_budget_nominal_ns": 8000000,
+  "calibrated_budget_fraction": 0.65,
+  "profile_overhead_warning": "Separate sequential batches, not thermally controlled. Inspect paired per-run series before inferring overhead.",
+  "memory_warning": "RSS is process-wide; peak RSS is a process-lifetime high-water mark, not per-engine allocation or an enforced limit.",
+  "cost_warning": "Frozen table contains p95 compute-wall-time plus an admission guard, not a CPU-quota guarantee.",
+  "host": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "cpu_count": 5,
+  "cgroup_cpu_max": "400000 100000",
+  "cgroup_memory_max": "4294967296",
+  "profiled": {
+    "declared_unprofiled": {
+      "B0_full": {
+        "wall_p50_us": 24.286,
+        "wall_p95_us": 31.04399999999997,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 0
+      },
+      "B1_parallel": {
+        "wall_p50_us": 26.649,
+        "wall_p95_us": 36.678799999999974,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 0
+      },
+      "B2_cache": {
+        "wall_p50_us": 18.287,
+        "wall_p95_us": 28.303999999999974,
+        "computations": 15500,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 0
+      },
+      "B3_cadence": {
+        "wall_p50_us": 18.768,
+        "wall_p95_us": 26.76,
+        "computations": 15305,
+        "deferred": 1170,
+        "counts": {
+          "valid": 39905,
+          "stale": 2720,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 1170
+      },
+      "P_freshness": {
+        "wall_p50_us": 25.027,
+        "wall_p95_us": 29.887999999999952,
+        "computations": 14725,
+        "deferred": 13950,
+        "counts": {
+          "valid": 27125,
+          "stale": 13175,
+          "unavailable": 3875,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 13950
+      }
+    },
+    "declared_profiled": {
+      "B0_full": {
+        "wall_p50_us": 42.283,
+        "wall_p95_us": 62.72679999999988,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8609792,
+        "thread_cpu_samples": 41075,
+        "status_mismatches_vs_B0": 0
+      },
+      "B1_parallel": {
+        "wall_p50_us": 45.157,
+        "wall_p95_us": 64.86399999999995,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8605696,
+        "thread_cpu_samples": 41075,
+        "status_mismatches_vs_B0": 0
+      },
+      "B2_cache": {
+        "wall_p50_us": 31.507,
+        "wall_p95_us": 53.41579999999991,
+        "computations": 15500,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8613888,
+        "thread_cpu_samples": 15500,
+        "status_mismatches_vs_B0": 0
+      },
+      "B3_cadence": {
+        "wall_p50_us": 32.107,
+        "wall_p95_us": 50.73379999999999,
+        "computations": 15305,
+        "deferred": 1170,
+        "counts": {
+          "valid": 39905,
+          "stale": 2720,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8609792,
+        "thread_cpu_samples": 15305,
+        "status_mismatches_vs_B0": 1170
+      },
+      "P_freshness": {
+        "wall_p50_us": 39.648,
+        "wall_p95_us": 58.17799999999999,
+        "computations": 14725,
+        "deferred": 13950,
+        "counts": {
+          "valid": 27125,
+          "stale": 13175,
+          "unavailable": 3875,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8609792,
+        "thread_cpu_samples": 14725,
+        "status_mismatches_vs_B0": 13950
+      }
+    },
+    "frozen_unprofiled": {
+      "B0_full": {
+        "wall_p50_us": 23.114,
+        "wall_p95_us": 32.365799999999986,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 0
+      },
+      "B1_parallel": {
+        "wall_p50_us": 25.518,
+        "wall_p95_us": 39.925,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 0
+      },
+      "B2_cache": {
+        "wall_p50_us": 17.636,
+        "wall_p95_us": 26.604999999999997,
+        "computations": 15500,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 0
+      },
+      "B3_cadence": {
+        "wall_p50_us": 18.087,
+        "wall_p95_us": 26.33299999999999,
+        "computations": 15305,
+        "deferred": 1170,
+        "counts": {
+          "valid": 39905,
+          "stale": 2720,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 1170
+      },
+      "P_freshness": {
+        "wall_p50_us": 24.757,
+        "wall_p95_us": 42.78299999999997,
+        "computations": 15500,
+        "deferred": 3875,
+        "counts": {
+          "valid": 37200,
+          "stale": 5425,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": null,
+        "thread_cpu_samples": 0,
+        "status_mismatches_vs_B0": 3875
+      }
+    },
+    "frozen_profiled": {
+      "B0_full": {
+        "wall_p50_us": 42.553,
+        "wall_p95_us": 70.59599999999979,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8617984,
+        "thread_cpu_samples": 41075,
+        "status_mismatches_vs_B0": 0
+      },
+      "B1_parallel": {
+        "wall_p50_us": 45.337,
+        "wall_p95_us": 71.68479999999997,
+        "computations": 41075,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8617984,
+        "thread_cpu_samples": 41075,
+        "status_mismatches_vs_B0": 0
+      },
+      "B2_cache": {
+        "wall_p50_us": 31.547,
+        "wall_p95_us": 53.761799999999894,
+        "computations": 15500,
+        "deferred": 0,
+        "counts": {
+          "valid": 41075,
+          "stale": 1550,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8617984,
+        "thread_cpu_samples": 15500,
+        "status_mismatches_vs_B0": 0
+      },
+      "B3_cadence": {
+        "wall_p50_us": 32.408,
+        "wall_p95_us": 55.75799999999998,
+        "computations": 15305,
+        "deferred": 1170,
+        "counts": {
+          "valid": 39905,
+          "stale": 2720,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8617984,
+        "thread_cpu_samples": 15305,
+        "status_mismatches_vs_B0": 1170
+      },
+      "P_freshness": {
+        "wall_p50_us": 40.56,
+        "wall_p95_us": 61.18099999999999,
+        "computations": 15500,
+        "deferred": 3875,
+        "counts": {
+          "valid": 37200,
+          "stale": 5425,
+          "unavailable": 1550,
+          "failed": 0
+        },
+        "peak_process_rss_bytes": 8617984,
+        "thread_cpu_samples": 15500,
+        "status_mismatches_vs_B0": 3875
+      }
+    }
+  },
+  "isolated_single_session": {
+    "b0": {
+      "csv_sha256": "ab451eea2a02cc2232c472da2cd7f9eb184546db0b62bd31f4b406a61fbdbf44",
+      "events": 660,
+      "process_peak_rss_bytes": 2441216,
+      "last_current_rss_bytes": 2441216,
+      "reserved_event_payload_bytes_lower_bound": 135168,
+      "computed_calls": 11459,
+      "deferrals": 0
+    },
+    "b1": {
+      "csv_sha256": "92463ba4f9aa7d1e6014b663258a8d1c1493a25e348ccd50f5452f3a2ccd9d15",
+      "events": 660,
+      "process_peak_rss_bytes": 2600960,
+      "last_current_rss_bytes": 2600960,
+      "reserved_event_payload_bytes_lower_bound": 135168,
+      "computed_calls": 11459,
+      "deferrals": 0
+    },
+    "b2": {
+      "csv_sha256": "bbb14c68f253b52f5261f4a2276f6b73d226e61839db9acf8bfdb593dd018b6f",
+      "events": 660,
+      "process_peak_rss_bytes": 2445312,
+      "last_current_rss_bytes": 2445312,
+      "reserved_event_payload_bytes_lower_bound": 135168,
+      "computed_calls": 4938,
+      "deferrals": 0
+    },
+    "b3": {
+      "csv_sha256": "3f457641c9be1e386547fbeb205e012dbcccbb95528ff501d644eb603ff6e97b",
+      "events": 660,
+      "process_peak_rss_bytes": 2445312,
+      "last_current_rss_bytes": 2445312,
+      "reserved_event_payload_bytes_lower_bound": 135168,
+      "computed_calls": 4899,
+      "deferrals": 234
+    },
+    "p": {
+      "csv_sha256": "8df5d591e71a140a6d0ca2e0bc17744f36737ffe7e94122ff7f2b2f190dcdfc1",
+      "events": 660,
+      "process_peak_rss_bytes": 2453504,
+      "last_current_rss_bytes": 2453504,
+      "reserved_event_payload_bytes_lower_bound": 135168,
+      "computed_calls": 4835,
+      "deferrals": 1102
+    }
+  }
+}

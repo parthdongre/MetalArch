@@ -1,0 +1,72 @@
+{
+  "baseline_manifest_sha256": "24a5ab7b24a3e3f4d9a156ee5d072f9bf853be6da99159388cccbc13efd24d0f",
+  "baseline_raw_csv_sha256": "65f44dae8c0e6e22460022e504a54eae3006f5f9b151a3380e0237bd26a3c3f8",
+  "caveats": [
+    "Studies ran sequentially, not randomized or CPU-pinned",
+    "Timings include synthetic ingestion and full graph execution",
+    "Opt-in rolling index uses 880 extra bytes per enabled bar stream on tested ABI",
+    "Separate descriptor revisions yield deliberately different fingerprint identities",
+    "No statistically established full-workload performance improvement"
+  ],
+  "created_utc": "2026-10-02T14:47:12.913346+00:00",
+  "incremental_manifest_sha256": "c27e8cdf828aaa23f901812e4ea5d8af57211e99b0f5359866cf30464b16bfbd",
+  "incremental_raw_csv_sha256": "8c0ee73178f798d2c68957d3ad94585b6f156bdbe543a34bd5270ee78df99ffd",
+  "policies": {
+    "B0_full": {
+      "baseline_p50_us": 23.956,
+      "baseline_p95_us": 37.13899999999998,
+      "difference_us": -0.3509999999999991,
+      "incremental_p50_us": 23.605,
+      "incremental_p95_us": 27.5308,
+      "same_compute_invocations": true,
+      "same_explicit_deferrals": true,
+      "samples_each": 3525
+    },
+    "B1_parallel": {
+      "baseline_p50_us": 26.358,
+      "baseline_p95_us": 44.73679999999996,
+      "difference_us": -0.41000000000000014,
+      "incremental_p50_us": 25.948,
+      "incremental_p95_us": 31.377999999999922,
+      "same_compute_invocations": true,
+      "same_explicit_deferrals": true,
+      "samples_each": 3525
+    },
+    "B2_cache": {
+      "baseline_p50_us": 18.067,
+      "baseline_p95_us": 30.516,
+      "difference_us": 0.08999999999999986,
+      "incremental_p50_us": 18.157,
+      "incremental_p95_us": 27.531,
+      "same_compute_invocations": true,
+      "same_explicit_deferrals": true,
+      "samples_each": 3525
+    },
+    "B3_cadence": {
+      "baseline_p50_us": 18.517,
+      "baseline_p95_us": 29.573800000000002,
+      "difference_us": -0.019999999999999574,
+      "incremental_p50_us": 18.497,
+      "incremental_p95_us": 26.296999999999997,
+      "same_compute_invocations": true,
+      "same_explicit_deferrals": true,
+      "samples_each": 3525
+    },
+    "P_freshness": {
+      "baseline_p50_us": 24.416,
+      "baseline_p95_us": 37.048799999999815,
+      "difference_us": 0.14999999999999858,
+      "incremental_p50_us": 24.566,
+      "incremental_p95_us": 32.9688,
+      "same_compute_invocations": true,
+      "same_explicit_deferrals": true,
+      "samples_each": 3525
+    }
+  },
+  "registered_stages": 19,
+  "source_modes": [
+    "SIMULATED"
+  ],
+  "status": "SINGLE_HOST_SYNTHETIC_M3_DIAGNOSTIC_NOT_PUBLICATION_CLAIM",
+  "trace_sha256": "d171a78b429ea06d6bd488e01bd62e8bb49bfc686ef4668d47dad05fd0978f1d"
+}

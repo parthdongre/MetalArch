@@ -1,35 +1,109 @@
 # MetalArch
 
-**Status: architecture proposal / research planning (2 October 2026). No new analytical implementation or MetalArch benchmarks have been completed.**
+**Research prototype: C++20 dependency-aware streaming analytics core.** It is a new implementation, not a rename of ASEP2, a production brokerage system, a validated forecasting model, an established patent, or a completed publication.
 
-MetalArch is a proposed freshness-aware, provenance-tracked, reproducible local analytics system using precious-metal market research as its workload.
+## Full expansion roadmap
 
-This repository is a **new implementation**, not a renamed copy of the legacy [ASEP2/Metals Terminal](https://github.com/parthdongre/ASEP2) repository. The original project remains untouched. Historical results and claims are not MetalArch measurements.
+See the [100× capability expansion master plan](docs/ROADMAP_100X.md). It separates the publication-critical constrained-resource system study from longer-term ASEP2 feature migration, UI, source adapters and optional research modules. Listed candidates are *not* completed implementations, demonstrated 100× speedups or established inventions.
 
-## Project objective
+## M3 pilot — optional shared incremental OHLCV terms
 
-Study whether dependency-aware selective recomputation with explicit output-validity and freshness contracts changes computation cost, output age, and correctness versus well-defined baselines under identical recorded-input workloads.
+`core-inc` and `expanded-inc` are opt-in alternatives to the unchanged `core` and `expanded` graphs. A bounded, source-owned rolling 20-bar index lets **four** existing engines reuse validated price/volume terms (realized RMS volatility, Parkinson volatility, Garman–Klass volatility and Amihud illiquidity). The original direct-computation engine revisions remain the default B0 reference. The new CTest checks the first 5,200 bars and all five policies, and the historical MA1 replay of the default cohorts remains byte-identical to M2. This is **not a demonstrated end-to-end acceleration**: the five-run synthetic pilot has mixed results, including no B2-cache median improvement. Details and the 880-byte-per-enabled-stream index measurement are in [docs/IMPLEMENTATION_M3.md](docs/IMPLEMENTATION_M3.md).
 
-The initial implementation must prioritize:
-1. An uncached, dependency-correct reference executor.
-2. Typed inputs, descriptors, source provenance, and explicit output validity.
-3. Correct cache keys and isolated run/session state.
-4. Recorded-input replay through the exact analytical execution path.
-5. Fair, reproducible benchmark baselines.
-6. A measured freshness-aware scheduling policy.
+```bash
+./build/metalarch_cli inventory expanded-inc
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 b2 8000000 expanded-inc
+```
 
-**Design specification:** [docs/BLUEPRINT.md](docs/BLUEPRINT.md)  
-**Acceptance and benchmark protocol:** [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md)  
-**Legacy provenance and known issues:** [docs/LEGACY_AUDIT.md](docs/LEGACY_AUDIT.md)
+## Implemented M1 milestone — instrumented native resources
 
-## Research integrity
+The [M1 implementation and evidence note](docs/IMPLEMENTATION_M1.md) documents opt-in engine wall/thread-CPU measurements, whole-process RSS and CPU metrics, B1 queue occupancy, lazily growing bounded event rings, and validated per-engine *frozen prior-trace calibration* for the P admission policy. Includes a standalone session-memory profiler to exclude the benchmark's retained B0 reference history, 10/10 local CTest targets under three toolchains/configurations, and a disjoint-calibration/held-out synthetic pilot. The [full 100× roadmap](docs/ROADMAP_100X.md) remains proposed beyond implemented milestones. **M1 does not yet enforce real CPU or RAM quotas or show P outperforming correct caching.**
 
-- Preserve the existing paper's listed authorship: Ramakrishna Bharsakde, Parth Dongre, Parth Birari, Atharv Patil, Aryan Patil; confirm affiliations/contributions before submission.
-- Distinguish planned design, implemented capabilities, externally verified facts, and actual measured results.
-- Do not assume any live exchange instrument or macro-feed semantics without independent validation.
-- Synthetic workloads and simulated inputs must be separately labeled.
-- No performance, predictive, novelty, or publication claims are made by this initial scaffold.
+## M2 completed — validated recorded-source ingestion and MA2 replay
 
-## Licensing and source migration
+[Implementation and threat model](docs/IMPLEMENTATION_M2.md) · [Synthetic three-stream source registry](fixtures/m2_bundle/source_manifest.tsv). M2 adds a strict one-source CSV adapter, bounded-memory k-way bundle recording for up to 256 independently declared bar/book streams, SHA-256-linked MA2 `E`/`D` event and duplicate audit rows, exclusive no-overwrite finalization, footer/root verification, optional independent root/manifest pinning, and replay into the existing native policies **without** rewriting the source as `fixture`. All included M2 example inputs are SIMULATED; any user-supplied OBSERVED flag and rights reference remain **unverified user declarations**. MA2 preserves MA1 compatibility and does not create a live exchange connection.
 
-No blanket migration or relicensing of ASEP2 code or third-party assets has been performed. Any reused module must be audited, attributed, and covered by an appropriate license/data-use review.
+```bash
+# Record and verify the three-stream synthetic fixture (choose an unused destination):
+./build/metalarch_trace record-bundle fixtures/m2_bundle/source_manifest.tsv build/demo.ma2 demo_bundle
+./build/metalarch_trace verify build/demo.ma2
+# Retain the printed root outside the recording, independently:
+./build/metalarch_trace verify build/demo.ma2 "$PINNED_ROOT" fixtures/m2_bundle/source_manifest.tsv
+./build/metalarch_cli replay build/demo.ma2 b2 8000000 expanded - "$PINNED_ROOT"
+```
+
+## Implemented execution modes
+
+| Policy | Behaviour |
+|---|---|
+| B0 | Correct sequential uncached full recomputation — reference/oracle |
+| B1 | Declared-DAG wave executor with persistent bounded worker pool; cheap waves execute serially to avoid excessive overhead |
+| B2 | Per-session source-version/parent-version cache with independent input/result age contracts |
+| B3 | Correct fixed cadence and separately disclosed last-known output when deferred |
+| P | Preliminary deadline-slack/dependency scheduling with declared costs or an explicit frozen, separately calibrated cost table; no hard CPU/memory quota |
+
+A typed `Descriptor` declares inputs, required parents, revision, parameters, source age, result age, cadence and nominal compute estimate. Missing dependencies, cycles and inconsistent descriptors fail early. Input keys include source, symbol, timeframe and kind. The ingestion store rejects non-finite/invalid events, sequence/time inversions, conflicting duplicates and invalid provenance modes, retains bounded history through a lazily growing O(1)-overwrite contiguous ring (maximum 4,096 events/stream by default), and exposes versioned rolling-content identity. Engines can read only declared sources. Downstream failures and provenance propagate explicitly. The source fingerprint uses a fast **non-cryptographic** digest; the manifest separately uses SHA-256 for artifact integrity. Ingest and evaluation must be serialized within one Session.
+
+**Workload selection:** the original 11-stage core remains accessible as `core`. The default `expanded` cohort contains **19 stages**: the core plus eight independently implemented ASEP2-derived C++ methods (ROC(12), Williams %R(14), CCI(20), Parkinson(20), Garman–Klass(20), Amihud(20), OBV/volume surge(30), and CUSUM(40)). These are audited *adaptations*, not an assertion that all legacy engines or their old combined normalized scores have been reproduced. The four inherited heuristic core nodes remain illustrative, not validated forecasts. Both cohorts use the same events, scheduler implementation and source/provenance contract. Source modes are OBSERVED/ESTIMATED/SIMULATED; generated fixture data are exclusively SIMULATED. See `docs/IMPLEMENTATION_PHASE3.md` and `docs/ENGINE_AUDIT.md` for definitions and edge cases.
+
+## Build and verify
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+./build/metalarch_tests
+./build/metalarch_legacy_tests
+
+# GCC/Clang sanitizer configuration
+cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DMETALARCH_SANITIZE=ON
+cmake --build build-sanitize --parallel
+ctest --test-dir build-sanitize --output-on-failure
+```
+
+CTest covers the native assertions, a real trace replay and all five policy smoke executions. The implementation has also been tested with GCC Release, GCC ASan/UBSan, and Clang Release locally. The GitHub workflow separately tests Ubuntu with GCC/Clang and macOS AppleClang; check workflow results rather than assuming remote cross-platform success.
+
+## Deterministic replay
+
+MA1 schema: `MA1|B or L|source|symbol|timeframe|seq|event_ns|ingest_ns|a|b|c|d|e|mode`.
+`B`: open/high/low/close/volume; `L`: bid/ask/bid_qty/ask_qty/reserved. Mode `0/1/2` is observed/estimated/simulated. This minimal schema does not reproduce full live exchange order-book delta semantics. Global ingestion timestamps must be non-decreasing. Source age and result computation age are distinct. Deferred outputs carry optional prior metadata but never pass its old value to a required downstream engine as VALID.
+
+```bash
+python3 fixtures/make_fixture.py --bars 70 --output fixtures/synthetic_70.ma1
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 b2 > cached.txt
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 b3 > cadence.txt
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > scheduled.txt
+```
+
+CLI policies: `b0`, `b1`, `b2` (default), `b3`, `p`. A final optional `core|expanded` argument selects the registered cohort; `expanded` is the default. The CLI can also report an inspectable workload inventory with `./build/metalarch_cli inventory core` or `./build/metalarch_cli inventory expanded`. Replay uses the same execution implementations as interactive sessions with a controlled input clock, not a reconstruction of engine-score telemetry. Exact same-platform replay is tested; cross-platform bitwise agreement is not guaranteed.
+
+## Cohort-scaled diagnostic (Phase III)
+
+Compare the 11-stage and 19-stage cohorts on the same deterministic fixture:
+
+```bash
+python3 benchmarks/run_study.py --bars 300 --runs 3 --warmup-bars 65 \
+  --cohort core --budget-ns 8000000 --outdir artifacts/core
+python3 benchmarks/run_study.py --bars 300 --runs 3 --warmup-bars 65 \
+  --cohort expanded --budget-ns 8000000 --outdir artifacts/expanded
+python3 benchmarks/plot_results.py artifacts/expanded/events.csv --outdir artifacts/expanded/figures
+```
+
+The benchmark manifest includes cohort name, dynamically verified stage count, SHA-256 for every native source and trace, and exact commands. Never directly compare a policy's absolute latency on **different engine cohorts** as though their computational workloads are equal. See `docs/IMPLEMENTATION_PHASE3.md`. This study remains synthetic and does not enforce a real CPU/memory budget; P charges descriptor-declared nominal costs.
+
+## Prior Phase II eleven-stage diagnostic benchmark
+
+```bash
+python3 benchmarks/run_study.py --bars 300 --runs 10 --warmup-bars 65 \
+  --budget-ns 8000000 --outdir artifacts/diagnostic_300_10
+```
+
+Output: `events.csv`, `summary.json`, `manifest.json`, `per_run.txt` and a SHA-256-labelled synthetic trace. Benchmark accepts the documented *fixture* XAU/XAG bars and book, not arbitrary claimed observational feeds. Modeled cost budget is based on declared initial cost estimates rather than measured/guaranteed actual CPU runtime. The first extended diagnostic found B0/B1/B2 status and numerical agreement with zero unflagged source-age violation. B1 did not outperform B0 on this lightweight workload; P deferred additional outputs without reducing compute invocations versus B2 for the tested budget. See `docs/BENCHMARK_NOTES.md` and `docs/IMPLEMENTATION_PHASE2.md` for numbers and caveats. **These are not publication-ready financial-data or real-time scheduling results.**
+
+## Paper continuity (ASEP2 → MetalArch)
+
+The primary [`paper/METALARCH_DRAFT.md`](paper/METALARCH_DRAFT.md) directly extends the ASEP2 Metals Terminal paper. The historical originals are preserved verbatim in [`paper/legacy/IEEE_RESEARCH_PAPER.md`](paper/legacy/IEEE_RESEARCH_PAPER.md) and [LaTeX](paper/legacy/IEEE_RESEARCH_PAPER.tex), while the earlier standalone systems draft is retained in [`paper/archive/METALARCH_SYSTEMS_DRAFT_2026-10-02.md`](paper/archive/METALARCH_SYSTEMS_DRAFT_2026-10-02.md). `paper/CONTINUATION_MAP.md` distinguishes original work, native implementation, and planned publication evaluation.
+
+## Research integrity and history
+
+Original ASEP2 historical paper authors (original order, subject to contribution/affiliation confirmation for a revision): Ramakrishna Bharsakde, Parth Dongre, Parth Birari, Atharv Patil, Aryan Patil. Historical counts and claims belong to their exact prior revision. Do not silently reuse external data or original code without rights and provenance review. See `docs/LEGACY_AUDIT.md`, `paper/METALARCH_DRAFT.md`, and `docs/ACCEPTANCE.md`. Novelty, patent eligibility, predictive performance, observed-source coverage, and peer-reviewed publication remain **unverified**. Public disclosure can affect patent strategy; any confidential inventive claim requires qualified prior-art/filing review before publication.

@@ -1,0 +1,10 @@
+/build/
+/build-*/
+*.o
+*.a
+*.so
+*.dSYM/
+__pycache__/
+*.pyc
+/benchmarks/results/
+/artifacts/

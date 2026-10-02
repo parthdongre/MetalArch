@@ -1,0 +1,16 @@
+M1 resource instrumentation and lazy-ring regression vs Phase III native source.
+Reference Phase III MetalArch commit: b80abd1268d3aa125958a0aa5eb6b9ed135d42e8.
+All lines below are exact SHA-256 hashes of the normalized CLI replay stdout for the
+SAME independent SIMULATED held-out evaluation trace (220 bars, start index 2001).
+Both separately compiled source versions produced byte-identical stdout per pair.
+core b0 75eb9fffa981541f2f9326cc638bf22187ce00ef781034051d96d967af9c98a7
+core b1 75eb9fffa981541f2f9326cc638bf22187ce00ef781034051d96d967af9c98a7
+core b2 27f5f74b6fafa2b59cb2f5cd7fcc4437ac924547dce693a11a1e53f06c53baae
+core b3 6771abe827494930a35d5af33d487f49e81df12496635ca3312338ff2bc4ef19
+core p 912bc4e06b3a4eea8cde38511fa52c0636bc44a5be04ca51e06d402e77
+expanded b0 f199a0ec395fc5c2f9619d5c3f54acc7b55e157806c24d5f682e6e87a3f8f790
+expanded b1 f199a0ec395fc5c2f9619d5c3f54acc7b55e157806c24d5f682e6e87a3f8f790
+expanded b2 940d1a93805283613b44f685b47ecddbb7c5e349d00f11d6b92bd0576dad2e53
+expanded b3 0e618baae14469f11d6a802bebfe90c073f75aea1ae1dd708469f64700597f3e
+expanded p 834810cf6332289540cd394717bc2f400b75dbc42d8faea840097950c3c2baac
+No cross-platform bitwise agreement is asserted. These are same-environment repeat checks.
