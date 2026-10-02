@@ -14,10 +14,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = ["CMakeLists.txt", "include/metalarch/core.hpp", "include/metalarch/engines.hpp", "include/metalarch/legacy_extensions.hpp",
-           "src/core.cpp", "src/engines.cpp", "src/legacy_extensions.cpp", "src/main.cpp", "benchmarks/compare.cpp",
+SOURCES = ["CMakeLists.txt", "include/metalarch/core.hpp", "include/metalarch/resource.hpp", "include/metalarch/engines.hpp", "include/metalarch/legacy_extensions.hpp",
+           "src/core.cpp", "src/resource.cpp", "src/engines.cpp", "src/legacy_extensions.cpp", "src/main.cpp", "benchmarks/compare.cpp", "benchmarks/calibrate.cpp",
            "benchmarks/bench.cpp", "benchmarks/run_study.py",
-           "benchmarks/run_budget_sweep.py", "benchmarks/plot_results.py", "fixtures/make_fixture.py", "tests/test_core.cpp", "tests/test_legacy.cpp"]
+           "benchmarks/run_budget_sweep.py", "benchmarks/run_m1_study.py", "benchmarks/plot_results.py", "fixtures/make_fixture.py", "tests/test_core.cpp", "tests/test_legacy.cpp", "tests/test_resource.cpp"]
 
 
 def sha256(path: Path) -> str:
@@ -57,6 +57,10 @@ def main() -> None:
                         help="DECLARED nominal cost-estimate budget, not actual CPU time")
     parser.add_argument("--exe", type=Path, default=ROOT / "build" / "metalarch_compare")
     parser.add_argument("--outdir", type=Path, default=ROOT / "artifacts" / "diagnostic")
+    parser.add_argument("--profile", action="store_true",
+                        help="Opt-in CPU/RSS profiling. Report separately from non-profiled timings")
+    parser.add_argument("--frozen-cost-table", type=Path,
+                        help="Previously calibrated complete TSV, applied to P only; NEVER fit on evaluation events")
     args = parser.parse_args()
     args.outdir.mkdir(parents=True, exist_ok=True)
     trace = args.trace.resolve() if args.trace else args.outdir / f"synthetic_{args.bars}.ma1"
@@ -69,10 +73,15 @@ def main() -> None:
         parser.error(f"build comparison executable first: {exe}")
     raw_path = args.outdir / "events.csv"
     command = [str(exe), str(trace), str(raw_path), str(args.runs),
-               str(args.warmup_bars), str(args.budget_ns), args.cohort]
+               str(args.warmup_bars), str(args.budget_ns), args.cohort,"1" if args.profile else "0"]
+    if args.frozen_cost_table:
+        if not args.frozen_cost_table.is_file():
+            parser.error("frozen-cost-table does not exist")
+        command.append(str(args.frozen_cost_table.resolve()))
     completed = subprocess.run(command, check=True, cwd=ROOT, capture_output=True, text=True)
     (args.outdir / "per_run.txt").write_text(completed.stdout, encoding="utf-8")
     rows = list(csv.DictReader(raw_path.open(encoding="utf-8", newline="")))
+    stage_path = Path(str(raw_path) + ".stages.csv") if args.profile else None
     groups: dict[str, list[dict[str, str]]] = defaultdict(list)
     for row in rows:
         groups[row["policy"]].append(row)
@@ -94,7 +103,32 @@ def main() -> None:
             "counts": {label: sum(int(r[label]) for r in vals)
                        for label in ("valid", "stale", "unavailable", "failed")},
             "max_common_valid_abs_error": max(float(r["max_common_valid_abs_error"]) for r in vals),
+            "engine_wall_time_sum_us": sum(int(r["measured_compute_wall_sum_ns"]) for r in vals) / 1000.0,
+            "thread_cpu_time_sum_us": (sum(int(r["measured_thread_cpu_sum_ns"]) for r in vals) / 1000.0)
+                                     if args.profile else None,
+            "thread_cpu_samples": sum(int(r["thread_cpu_samples"]) for r in vals),
+            "max_worker_queue_occupancy": max(int(r["worker_queue_highwater"]) for r in vals),
+            "peak_process_rss_bytes": max((int(r["process_peak_rss_bytes"]) for r in vals
+                                           if r["process_peak_rss_bytes"]), default=None),
+            "rss_last_sample_bytes": next((int(r["rss_after_bytes"]) for r in reversed(vals)
+                                            if r["rss_after_bytes"]), None),
         }
+    if stage_path:
+        engine_groups: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+        with stage_path.open(encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                engine_groups[(row["policy"], row["engine_id"])].append(row)
+        engine_profile = {}
+        for (policy, engine), vals in sorted(engine_groups.items()):
+            engine_profile.setdefault(policy, {})[engine] = {
+                "computed_calls": len(vals),
+                "wall_p50_ns": quantile([int(x["compute_wall_ns"]) for x in vals], .5),
+                "wall_p95_ns": quantile([int(x["compute_wall_ns"]) for x in vals], .95),
+                "thread_cpu_p95_ns": quantile([int(x["thread_cpu_ns"]) for x in vals
+                                                 if x["thread_cpu_ns"]], .95)
+                                       if any(x["thread_cpu_ns"] for x in vals) else None,
+            }
+        (args.outdir / "engine_profile.json").write_text(json.dumps(engine_profile, indent=2) + "\n", encoding="utf-8")
     manifest = {
         "kind": "LOCAL_SYNTHETIC_DIAGNOSTIC_NOT_PUBLICATION_FINDING",
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -104,6 +138,7 @@ def main() -> None:
         "cohort": args.cohort, "registered_stages": 19 if args.cohort=="expanded" else 11,
         "trace_path": str(trace), "trace_sha256": sha256(trace),
         "csv_sha256": sha256(raw_path), "binary_sha256": sha256(exe),
+        "engine_profile_csv_sha256": sha256(stage_path) if stage_path else None,
         "platform": platform.platform(), "cpu": platform.processor(),
         "cpu_count": os.cpu_count(), "python": platform.python_version(),
         "cxx_version": capture("c++", "--version").splitlines()[0],
@@ -112,10 +147,16 @@ def main() -> None:
         "assumptions": ["source mode SIMULATED for generated trace",
                         "local ingestion plus execution only; no network latency",
                         "no CPU pinning, frequency or thermal control",
-                        "P uses declared initial estimated costs, not empirical calibrated service times",
+                        ("P uses independent frozen calibrated costs, not hard enforced CPU quotas"
+                         if args.frozen_cost_table else "P uses declared initial estimated costs, not empirical calibrated service times"),
+                        ("opt-in profiling ON; do not pool timing series with no-profile run"
+                         if args.profile else "opt-in profiling OFF; RSS/thread CPU columns unavailable"),
                         "reference checked per event for correctness baselines"],
         "command": command, "warmup_bars": args.warmup_bars, "runs": args.runs,
         "budget_nominal_ns": args.budget_ns,
+        "profile_resources": args.profile,
+        "cost_model": "FROZEN_PREVIOUS_TRACE" if args.frozen_cost_table else "DECLARED",
+        "cost_table_sha256": sha256(args.frozen_cost_table) if args.frozen_cost_table else None,
     }
     (args.outdir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     (args.outdir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

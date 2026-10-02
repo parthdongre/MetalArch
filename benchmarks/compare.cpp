@@ -16,6 +16,8 @@ namespace {
 struct Sample {
   double wall_us{0}, cpu_us{0};
   uint64_t computes{0}, hits{0}, deferred{0}, estimated_ns{0};
+  uint64_t measured_wall_sum_ns{0},measured_thread_cpu_sum_ns{0},thread_cpu_observed{0};
+  std::optional<CycleResources> resources;
   int valid{0}, stale{0}, missing{0}, failed{0}, mismatches{0}, unflagged_age{0};
   double largest_error{0};
 };
@@ -97,8 +99,8 @@ Sample inspect(const Results& got,const Results& oracle,const Graph& graph){
 }
 int main(int argc,char** argv){
  try{
-  if(argc<3||argc>7){
-    std::cerr<<"usage: metalarch_compare <input.ma1> <raw.csv> [runs=10] [warmup_bars=65] [P_budget_ns=8000000] [cohort=expanded|core]\n";
+  if(argc<3||argc>9){
+    std::cerr<<"usage: metalarch_compare <input.ma1> <raw.csv> [runs=10] [warmup_bars=65] [P_budget_ns=8000000] [cohort=expanded|core] [profile=0|1] [frozen-cost-table.tsv]\n";
     return 2;
   }
   const auto trace=load(argv[1]);
@@ -111,6 +113,9 @@ int main(int argc,char** argv){
   const std::string cohort=(argc>=7?argv[6]:"expanded");
   if(cohort!="expanded" && cohort!="core")throw std::invalid_argument("cohort must be expanded or core");
   const Graph graph=make_metal_graph(gold,silver,book,cohort=="expanded");
+  const bool profile=argc>=8?std::string(argv[7])=="1":false;
+  if(argc>=8 && std::string(argv[7])!="0" && std::string(argv[7])!="1")throw std::invalid_argument("profile must be 0 or 1");
+  const auto frozen=argc>=9?load_frozen_cost_table(argv[8],graph):std::map<std::string,uint64_t>{};
   // Reference is generated independently and never shared with candidate state.
   Session oracle(graph);
   std::vector<Results> reference;
@@ -122,7 +127,13 @@ int main(int argc,char** argv){
   std::ofstream raw(argv[2]);
   if(!raw)throw std::runtime_error("cannot create raw output file");
   raw.imbue(std::locale::classic());
-  raw<<"run,policy,event_index,ingest_ns,wall_us,process_cpu_us,computations,hits,deferred,estimated_cost_ns,valid,stale,unavailable,failed,status_mismatches,max_common_valid_abs_error,unflagged_age_violations\n";
+  std::ofstream per_engine;
+  if(profile){
+    per_engine.open(std::string(argv[2])+".stages.csv",std::ios::trunc);
+    if(!per_engine)throw std::runtime_error("cannot create per-engine profile CSV");
+    per_engine<<"run,policy,event_index,engine_id,status,compute_wall_ns,thread_cpu_ns\n";
+  }
+  raw<<"run,policy,event_index,ingest_ns,wall_us,process_cpu_us,computations,hits,deferred,estimated_cost_ns,valid,stale,unavailable,failed,status_mismatches,max_common_valid_abs_error,unflagged_age_violations,measured_compute_wall_sum_ns,measured_thread_cpu_sum_ns,thread_cpu_samples,rss_after_bytes,process_peak_rss_bytes,profiled_process_cpu_ns,worker_queue_highwater\n";
   raw<<std::fixed<<std::setprecision(6);
   std::vector<Policy> policies={Policy::SequentialFull,Policy::ParallelFull,Policy::Cache,Policy::FixedCadence,Policy::Freshness};
   for(int run=0;run<runs;++run){
@@ -130,6 +141,7 @@ int main(int argc,char** argv){
     std::rotate(policies.begin(),policies.begin()+1,policies.end());
     for(auto policy:policies){
       Session session(graph);
+      if(!frozen.empty())session.set_frozen_costs(frozen);
       std::vector<double> timings;
       int mismatch=0,unflagged=0,valid=0,stale=0,failed=0,missing=0;
       uint64_t computes=0,hits=0,deferrals=0;
@@ -139,7 +151,9 @@ int main(int argc,char** argv){
         const auto wall_start=std::chrono::steady_clock::now();
         const auto cpu_start=std::clock();
         if(session.store().ingest(e)!=Ingest::Accepted)throw std::runtime_error("benchmark input rejected");
-        const auto result=session.execute(e.ingest_ns,policy,{4,budget});
+        PolicyOptions opts{4,budget};opts.profile_resources=profile;
+        if(policy==Policy::Freshness&&!frozen.empty())opts.cost_model=CostModel::FrozenCalibration;
+        const auto result=session.execute(e.ingest_ns,policy,opts);
         const auto wall_end=std::chrono::steady_clock::now();
         const auto cpu_end=std::clock();
         if(!same_current_semantics(result,reference[i]) &&
@@ -153,12 +167,31 @@ int main(int argc,char** argv){
         v.hits=session.last_run().cache_hits;
         v.deferred=session.last_run().deferred;
         v.estimated_ns=session.last_run().estimated_cost_ns;
+        v.measured_wall_sum_ns=session.last_run().actual_compute_wall_sum_ns;
+        v.measured_thread_cpu_sum_ns=session.last_run().actual_compute_thread_cpu_sum_ns;
+        v.resources=session.last_run().resources;
+        for(const auto& measurement:session.last_run().engine_measurements)
+          if(measurement.thread_cpu_ns)++v.thread_cpu_observed;
+        if(profile){
+          for(const auto& measurement:session.last_run().engine_measurements){
+            per_engine<<run<<','<<policy_name(policy)<<','<<i<<','<<measurement.id<<','
+                      <<name(measurement.status)<<','<<measurement.wall_ns<<',';
+            if(measurement.thread_cpu_ns)per_engine<<*measurement.thread_cpu_ns;
+            per_engine<<'\n';
+          }
+        }
         timings.push_back(v.wall_us);
         mismatch+=v.mismatches;unflagged+=v.unflagged_age;
         valid+=v.valid;stale+=v.stale;missing+=v.missing;failed+=v.failed;
         computes+=v.computes;hits+=v.hits;deferrals+=v.deferred;
         maxerror=std::max(maxerror,v.largest_error);
-        raw<<run<<','<<policy_name(policy)<<','<<i<<','<<e.ingest_ns<<','<<v.wall_us<<','<<v.cpu_us<<','<<v.computes<<','<<v.hits<<','<<v.deferred<<','<<v.estimated_ns<<','<<v.valid<<','<<v.stale<<','<<v.missing<<','<<v.failed<<','<<v.mismatches<<','<<v.largest_error<<','<<v.unflagged_age<<'\n';
+        raw<<run<<','<<policy_name(policy)<<','<<i<<','<<e.ingest_ns<<','<<v.wall_us<<','<<v.cpu_us<<','<<v.computes<<','<<v.hits<<','<<v.deferred<<','<<v.estimated_ns<<','<<v.valid<<','<<v.stale<<','<<v.missing<<','<<v.failed<<','<<v.mismatches<<','<<v.largest_error<<','<<v.unflagged_age<<','<<v.measured_wall_sum_ns<<','<<v.measured_thread_cpu_sum_ns<<','<<v.thread_cpu_observed<<',';
+        if(v.resources && v.resources->current_rss_supported)raw<<v.resources->rss_after_bytes;
+        raw<<',';
+        if(v.resources && v.resources->peak_rss_supported)raw<<v.resources->process_peak_rss_bytes;
+        raw<<',';
+        if(v.resources)raw<<v.resources->process_cpu_ns;
+        raw<<','<<session.last_run().worker_queue_highwater<<'\n';
       }
       if(unflagged)throw std::runtime_error("VALID output violates source age in "+policy_name(policy));
       std::cout<<"run="<<run<<" policy="<<policy_name(policy)<<" samples="<<timings.size()
@@ -170,6 +203,7 @@ int main(int argc,char** argv){
     }
   }
   if(!raw)throw std::runtime_error("raw output write failure");
+  if(profile && !per_engine)throw std::runtime_error("per-engine profile output write failure");
   return 0;
  }catch(const std::exception& e){std::cerr<<"benchmark ERROR: "<<e.what()<<'\n';return 1;}
 }

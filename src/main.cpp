@@ -34,8 +34,8 @@ int main(int argc,char** argv){
    }
    return 0;
  }
- if(argc<3||argc>6||std::string(argv[1])!="replay"){
-   std::cerr<<"usage: metalarch_cli replay <trace.ma1> [b0|b1|b2|b3|p] [p_budget_nominal_ns] [cohort=expanded|core]\n";
+ if(argc<3||argc>7||std::string(argv[1])!="replay"){
+   std::cerr<<"usage: metalarch_cli replay <trace.ma1> [b0|b1|b2|b3|p] [budget_cost_ns] [cohort=expanded|core] [FROZEN_COSTS.tsv]\n";
    return 2;
  }
  const ma::Key gold{"fixture","XAU","1m",ma::Kind::Bar},silver{"fixture","XAG","1m",ma::Kind::Bar},book{"fixture","XAU","live",ma::Kind::Book};
@@ -44,6 +44,12 @@ int main(int argc,char** argv){
    const std::string cohort=argc>=6?argv[5]:"expanded";
    if(cohort!="core" && cohort!="expanded")throw std::invalid_argument("invalid cohort");
    ma::Session session(ma::make_metal_graph(gold,silver,book,cohort=="expanded"));
+   ma::PolicyOptions options;
+   if(argc==7){
+     if(std::string(argv[3])!="p")throw std::invalid_argument("frozen table is only used with P policy");
+     session.set_frozen_costs(ma::load_frozen_cost_table(argv[6],ma::make_metal_graph(gold,silver,book,cohort=="expanded")));
+     options.cost_model=ma::CostModel::FrozenCalibration;
+   }
    std::ifstream input(argv[2]);if(!input)throw std::runtime_error("cannot read trace");
    const auto policy=(argc>=4?parse_policy(argv[3]):ma::Policy::Cache);
    uint64_t budget=8'000'000;
@@ -59,7 +65,8 @@ int main(int argc,char** argv){
      const auto status=session.store().ingest(e);
      if(status==ma::Ingest::Accepted){
        ++accepted;
-       auto result=session.execute(e.ingest_ns,policy,{4,budget});
+       options.compute_budget_ns=budget;
+       auto result=session.execute(e.ingest_ns,policy,options);
        std::cout<<"event="<<accepted<<'|'<<ma::normalized_result(result);
        hits+=session.last_run().cache_hits;computes+=session.last_run().computations;
        deferred+=session.last_run().deferred;

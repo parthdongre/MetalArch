@@ -64,19 +64,33 @@ public:
       std::lock_guard lock(mutex_);
       if(stopping_)throw std::logic_error("worker pool is closing");
       tasks_.emplace_back([job](){(*job)();});
+      queue_highwater_=std::max(queue_highwater_,tasks_.size());
     }
     cv_.notify_one();
     return answer;
   }
+  void reset_highwater(){std::lock_guard lock(mutex_);queue_highwater_=tasks_.size();}
+  size_t highwater(){std::lock_guard lock(mutex_);return queue_highwater_;}
 private:
   std::mutex mutex_;
   std::condition_variable cv_;
   std::deque<std::function<void()>> tasks_;
   std::vector<std::thread> threads_;
   bool stopping_{false};
+  size_t queue_highwater_{0};
 };
 Session::Session(Graph graph):graph_(std::move(graph)){}
 Session::~Session()=default;
+void Session::set_frozen_costs(const std::map<std::string,uint64_t>& costs){
+  if(costs.size()!=graph_.sorted().size())
+    throw std::invalid_argument("calibration must cover every registered engine");
+  for(const auto& d:graph_.sorted()){
+    const auto it=costs.find(d.id);
+    if(it==costs.end() || it->second==0)
+      throw std::invalid_argument("missing or zero calibration cost: "+d.id);
+  }
+  frozen_cost_ns_=costs;
+}
 Ingest Store::ingest(const Event& e) {
   if(static_cast<uint8_t>(e.key.kind)>static_cast<uint8_t>(Kind::Book) ||
      static_cast<uint8_t>(e.mode)>static_cast<uint8_t>(Mode::Simulated) ||
@@ -154,13 +168,41 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
   if(now_ns<=0 || (last_eval_ns_!=0 && now_ns<last_eval_ns_))
     throw std::invalid_argument("invalid / backwards evaluation timestamp; reset before replay");
   if(options.workers==0 || options.workers>256)throw std::invalid_argument("workers must be in 1..256");
+  if(policy==Policy::Freshness && options.cost_model==CostModel::FrozenCalibration &&
+     frozen_cost_ns_.size()!=graph_.sorted().size())
+    throw std::invalid_argument("frozen P policy requires a complete calibration table");
+  if(options.cost_model!=CostModel::Declared && options.cost_model!=CostModel::FrozenCalibration)
+    throw std::invalid_argument("unknown cost model");
+  const ResourceSnapshot profile_start=options.profile_resources?sample_process_resources():ResourceSnapshot{};
   last_eval_ns_=now_ns;
   ++cycles_;
   last_run_={};
   const auto& ordered=graph_.sorted();
   Results outputs;
+  const auto cost_of=[&](const Descriptor& d)->uint64_t{
+    if(policy==Policy::Freshness && options.cost_model==CostModel::FrozenCalibration)
+      return frozen_cost_ns_.at(d.id);
+    return d.estimated_cost_ns;
+  };
+  const auto finalize=[&](){
+    if(!options.profile_resources)return;
+    const auto end=sample_process_resources();
+    CycleResources cycle;
+    cycle.process_cpu_ns=end.process_cpu_ns>=profile_start.process_cpu_ns?
+      end.process_cpu_ns-profile_start.process_cpu_ns:0;
+    cycle.rss_before_bytes=profile_start.current_rss_bytes;
+    cycle.rss_after_bytes=end.current_rss_bytes;
+    cycle.process_peak_rss_bytes=end.peak_rss_bytes;
+    cycle.current_rss_supported=profile_start.current_rss_supported && end.current_rss_supported;
+    cycle.peak_rss_supported=end.peak_rss_supported;
+    cycle.reserved_event_payload_bytes_lower_bound=store_.reserved_event_payload_bytes_lower_bound();
+    last_run_.resources=cycle;
+  };
   const bool cache_policy=(policy==Policy::Cache||policy==Policy::FixedCadence||policy==Policy::Freshness);
-  struct Outcome { Result result; bool cache_hit{false}; bool computed{false}; uint64_t measured_compute_ns{0}; };
+  struct Outcome {
+    Result result; bool cache_hit{false}; bool computed{false};
+    uint64_t measured_compute_ns{0};std::optional<uint64_t> measured_thread_cpu_ns;
+  };
 
   // No mutation of Store, memo, outputs or counters occurs in this evaluator.
   // That is the essential B1 parallelism invariant.
@@ -239,6 +281,8 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
       return out;
     }
     out.computed=true;
+    std::optional<uint64_t> thread_start;
+    if(options.profile_resources)thread_start=sample_thread_cpu_ns();
     const auto compute_start=std::chrono::steady_clock::now();
     try{
       ReadView view(store_,d.sources);
@@ -249,6 +293,12 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
     catch(...){r=Result{};r.status=Status::Failed;r.reason="unknown engine exception";}
     out.measured_compute_ns=static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now()-compute_start).count());
+    if(thread_start.has_value()){
+      const uint64_t first_cpu=*thread_start;
+      const auto thread_end=sample_thread_cpu_ns();
+      if(thread_end.has_value() && *thread_end>=first_cpu)
+        out.measured_thread_cpu_ns=*thread_end-first_cpu;
+    }
     if(r.status==Status::Valid && (!r.value || !std::isfinite(*r.value))){
       r.status=Status::Failed;r.value.reset();r.reason="valid result has no finite value";
     }
@@ -270,9 +320,20 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
       const uint64_t sample=std::max<uint64_t>(1,out.measured_compute_ns);
       auto& estimate=measured_cost_ns_[d.id];
       estimate=(estimate==0?sample:(estimate/8)*7+(sample/8));
-      if(UINT64_MAX-last_run_.estimated_cost_ns<d.estimated_cost_ns)
+      const uint64_t charge=cost_of(d);
+      if(UINT64_MAX-last_run_.estimated_cost_ns<charge)
         throw std::overflow_error("estimated cost overflow");
-      last_run_.estimated_cost_ns+=d.estimated_cost_ns;
+      last_run_.estimated_cost_ns+=charge;
+      if(UINT64_MAX-last_run_.actual_compute_wall_sum_ns<out.measured_compute_ns)
+        throw std::overflow_error("wall-time sample overflow");
+      last_run_.actual_compute_wall_sum_ns+=out.measured_compute_ns;
+      if(out.measured_thread_cpu_ns){
+        if(UINT64_MAX-last_run_.actual_compute_thread_cpu_sum_ns<*out.measured_thread_cpu_ns)
+          throw std::overflow_error("thread CPU sample overflow");
+        last_run_.actual_compute_thread_cpu_sum_ns+=*out.measured_thread_cpu_ns;
+      }
+      if(options.profile_resources)last_run_.engine_measurements.push_back(
+        {d.id,out.result.status,out.measured_compute_ns,out.measured_thread_cpu_ns});
       if(cache_policy && out.result.status==Status::Valid)memo_[d.id]=out.result;
     }
     if(out.result.reason=="compute deferred by execution policy")++last_run_.deferred;
@@ -280,6 +341,7 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
     outputs.emplace(d.id,std::move(out.result));
   };
   if(policy==Policy::ParallelFull){
+    if(pool_)pool_->reset_highwater();
     // Waves derived from actual declared dependencies, never manually assigned.
     std::map<std::string,size_t> level;
     std::vector<std::vector<size_t>> waves;
@@ -324,7 +386,8 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
         for(size_t j=0;j<count;++j)publish(ordered[wave[offset+j]],std::move(ready[j]));
       }
     }
-    return outputs;
+    if(pool_)last_run_.worker_queue_highwater=pool_->highwater();
+    finalize();return outputs;
   }
   if(policy==Policy::Freshness){
     // A bounded-budget ready queue: derive a node's deadline from its own
@@ -357,12 +420,13 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
     }
     std::vector<int64_t> priority_due=due;
     for(size_t pos=n;pos-->0;){
-      critical[pos]=ordered[pos].estimated_cost_ns;
+      critical[pos]=cost_of(ordered[pos]);
       for(size_t child:children[pos]){
         priority_due[pos]=std::min(priority_due[pos],priority_due[child]);
         const uint64_t tail=critical[child];
-        critical[pos]=std::max(critical[pos],tail>UINT64_MAX-ordered[pos].estimated_cost_ns?
-                                 UINT64_MAX:tail+ordered[pos].estimated_cost_ns);
+        const auto own=cost_of(ordered[pos]);
+        critical[pos]=std::max(critical[pos],tail>UINT64_MAX-own?
+                                 UINT64_MAX:tail+own);
       }
     }
     struct Ready{long double slack;std::string id;size_t index;};
@@ -379,21 +443,22 @@ Results Session::execute(int64_t now_ns,Policy policy,PolicyOptions options) {
     while(!queue.empty()){
       const size_t i=queue.top().index;queue.pop();
       const Descriptor& d=ordered[i];
-      bool allow=(options.compute_budget_ns==0 || d.estimated_cost_ns<=remaining);
+      const uint64_t charge=cost_of(d);
+      bool allow=(options.compute_budget_ns==0 || charge<=remaining);
       auto out=evaluate(d,outputs,allow,true);
-      if(out.computed && options.compute_budget_ns!=0)remaining-=d.estimated_cost_ns;
+      if(out.computed && options.compute_budget_ns!=0)remaining-=charge;
       publish(d,std::move(out));++emitted;
       for(size_t child:children[i])if(--degree[child]==0)add(child);
     }
     if(emitted!=n)throw std::logic_error("validated dependency graph unexpectedly incomplete");
-    return outputs;
+    finalize();return outputs;
   }
   for(const auto& d:ordered){
     const bool allow=(policy!=Policy::FixedCadence || d.cadence==1 || !memo_.contains(d.id) ||
                       cycles_==1 || (cycles_-1)%d.cadence==0);
     publish(d,evaluate(d,outputs,allow,cache_policy));
   }
-  return outputs;
+  finalize();return outputs;
 }
 void Session::reset(){store_.reset();memo_.clear();hits_=computations_=cycles_=0;last_eval_ns_=0;last_run_={};measured_cost_ns_.clear();}
 std::string name(Status s){switch(s){case Status::Valid:return "VALID";case Status::Stale:return "STALE";case Status::Unavailable:return "UNAVAILABLE";case Status::Failed:return "FAILED";}return "UNKNOWN";}

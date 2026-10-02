@@ -34,6 +34,13 @@ jobs:
           ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > first.txt
           ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > second.txt
           cmp first.txt second.txt
+      - name: Frozen calibration reproducibility
+        shell: bash
+        run: |
+          ./build/metalarch_calibrate fixtures/synthetic_70.ma1 build/ci-frozen.tsv expanded 195 5
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 expanded build/ci-frozen.tsv > frozen1.txt
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 expanded build/ci-frozen.tsv > frozen2.txt
+          cmp frozen1.txt frozen2.txt
       - name: Configure sanitizers
         if: matrix.sanitize
         run: cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DMETALARCH_SANITIZE=ON
