@@ -52,7 +52,7 @@
   "source_sha256": {
     ".github/workflows/native.yml": "cfe1fafd4e053ba5f30efef7fb80f8b6b7e8eb5873f1c329e2c89091b16d2155",
     "CMakeLists.txt": "fa6646bb774997557bfd34e16533e58ce0ad04bd6cedc60915628d46592204fb",
-    "README.md": "a21b86c13b6f3f2024b4730af0240bf9bef12dec15d945843eae0068c5df2f32",
+    "README.md": "deeaba74b317fa4ad24ddf8fa97ee7be5ea38201ca1da0442dd23cbe4eb4d4b4",
     "docs/IMPLEMENTATION_M2.md": "4a9687dd61db5d9ecf0dbb5c192fde5deb6f52f5af957f37b39029cefd218b3a",
     "fixtures/m2_bundle/gold_bars.csv": "166da326c34a8e0f4bfe302d0640bb720ffd4445ca3d35a7b6782cf5f094f1a4",
     "fixtures/m2_bundle/gold_book.csv": "b186a0b87cb6a0702b4ae0cd6c30487d6ca1719851a18910c9a64197bff81552",
