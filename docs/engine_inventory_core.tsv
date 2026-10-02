@@ -1,0 +1,12 @@
+id	revision	parameters	inputs	parents	max_source_age_ns	max_result_age_ns	cadence	declared_cost_ns
+atr	true-range-sma-v1	window=14	fixture:XAU:1m:bar		120000000000	0	1	1000000
+book_imbalance	top-of-book-imbalance-v1	snapshot=1	fixture:XAU:live:book		5000000000	0	1	1000000
+momentum	rsi-wilder-v1	period=14	fixture:XAU:1m:bar		120000000000	0	1	1000000
+peer_corr	pearson-matched-time-v1	returns=12	fixture:XAU:1m:bar,fixture:XAG:1m:bar		120000000000	0	1	2000000
+spectral	goertzel-concentration-v1	window=64;k=1..8	fixture:XAU:1m:bar		120000000000	0	4	4000000
+trend	ema-8-21-v1	fast=8;slow=21	fixture:XAU:1m:bar		120000000000	0	1	1000000
+forecast	illustrative-forecast-v1	weights=0.7,0.3		trend,momentum	120000000000	0	1	1000000
+volatility	realized-rms-v1	window=20	fixture:XAU:1m:bar		120000000000	0	1	1000000
+regime	heuristic-regime-v1	scale=100		trend,volatility	120000000000	0	1	1000000
+risk	heuristic-risk-v1	scale=100		volatility,atr	120000000000	0	1	1000000
+fusion	illustrative-fusion-v1	weights=0.3,0.2,0.2,0.2,0.1		regime,risk,forecast,peer_corr,book_imbalance	120000000000	0	1	1000000

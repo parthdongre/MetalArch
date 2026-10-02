@@ -1,0 +1,62 @@
+{
+  "kind": "LOCAL_SYNTHETIC_DIAGNOSTIC_NOT_PUBLICATION_FINDING",
+  "timestamp_utc": "2026-10-02T12:48:47.089987+00:00",
+  "git_head": "unavailable",
+  "git_dirty": "unavailable",
+  "source_sha256": {
+    "CMakeLists.txt": "8b691ff7a78ec8948dea02f2407e6297abd575178acb554c38293c53c8d141f4",
+    "include/metalarch/core.hpp": "6dfd25990ebe7789cf953077a6da25a3ef2d0990450362d9d2048cf9a27f65a3",
+    "include/metalarch/engines.hpp": "ae7c8147d6dab94088363579ca6ac3b3957e766aae19f487b73163233ee21387",
+    "include/metalarch/legacy_extensions.hpp": "d2371fd273255d74db29837fbab703ab308d42ea55ec302bedb1ec96c679f41c",
+    "src/core.cpp": "98ef55ef67891d6c3e224bc9a55b2bd91b96a1aaab4717f1129d5c14b1ab48e1",
+    "src/engines.cpp": "b9f5a12f576203b00d5d111bd9be32d7b2f7ef6ab6e0ae5588a67458417f7ee9",
+    "src/legacy_extensions.cpp": "791fc559bfd56d9e07ceec20cf9099246091dccdb8895dab20c94622514d0f57",
+    "src/main.cpp": "b065998d2fed531b38d49c6c6462067830f48441be2cbe4014da928ccfa0b73f",
+    "benchmarks/compare.cpp": "e9a4f2af03f97c4679b3cf87b151a91b0a181136098846cfb591b1ff7ae4c3d5",
+    "benchmarks/bench.cpp": "da3b952784305b37ed522316baf2c98a7cfcb1abd4e38132e6031a06d4e5632a",
+    "benchmarks/run_study.py": "5968f50e4b230b488f33ae953ebad49350cd19839413778ec955dc43f10a3064",
+    "benchmarks/run_budget_sweep.py": "7aef90ae5d5d3fc32425b6b4349c1e34005465a8d69620c765d73d8de3f89eb0",
+    "benchmarks/plot_results.py": "acc77d1628f58542d038d99e24c5253c952093ace2d329f446c1247dbff06372",
+    "fixtures/make_fixture.py": "9af5f72b178bf4550481679a979620101b368c423236dc6eff840c080debc7c5",
+    "tests/test_core.cpp": "6d1896316e3720fdb3162f274b655fcbb88d159f34f75f554c3fff800919f175",
+    "tests/test_legacy.cpp": "f59cbfd1b43b1df7e2988275ba5c75d79ee102a9f58e58caad66541750ee2e62"
+  },
+  "cohort": "expanded",
+  "registered_stages": 19,
+  "trace_path": "/mnt/data/metalarch_phase3/artifacts/phase3_expanded/synthetic_300.ma1",
+  "trace_sha256": "d171a78b429ea06d6bd488e01bd62e8bb49bfc686ef4668d47dad05fd0978f1d",
+  "csv_sha256": "632fd56092affc5fd33052475a5d75402211571ba00fda38d5d8d7810d1b61e0",
+  "binary_sha256": "ffddcec8ed5cba11524c2f280647142509b6a7e996280d04b7fdd0f85fab7aa3",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "cpu": "",
+  "cpu_count": 5,
+  "python": "3.13.5",
+  "cxx_version": "c++ (Debian 14.2.0-19) 14.2.0",
+  "cmake_version": "cmake version 3.31.6",
+  "policies": [
+    "B0_full",
+    "B1_parallel",
+    "B2_cache",
+    "B3_cadence",
+    "P_freshness"
+  ],
+  "assumptions": [
+    "source mode SIMULATED for generated trace",
+    "local ingestion plus execution only; no network latency",
+    "no CPU pinning, frequency or thermal control",
+    "P uses declared initial estimated costs, not empirical calibrated service times",
+    "reference checked per event for correctness baselines"
+  ],
+  "command": [
+    "/mnt/data/metalarch_phase3/build/metalarch_compare",
+    "/mnt/data/metalarch_phase3/artifacts/phase3_expanded/synthetic_300.ma1",
+    "artifacts/phase3_expanded/events.csv",
+    "3",
+    "65",
+    "8000000",
+    "expanded"
+  ],
+  "warmup_bars": 65,
+  "runs": 3,
+  "budget_nominal_ns": 8000000
+}

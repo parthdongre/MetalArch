@@ -97,8 +97,8 @@ Sample inspect(const Results& got,const Results& oracle,const Graph& graph){
 }
 int main(int argc,char** argv){
  try{
-  if(argc<3||argc>6){
-    std::cerr<<"usage: metalarch_compare <input.ma1> <raw.csv> [runs=10] [warmup_bars=65] [P_budget_ns=8000000]\n";
+  if(argc<3||argc>7){
+    std::cerr<<"usage: metalarch_compare <input.ma1> <raw.csv> [runs=10] [warmup_bars=65] [P_budget_ns=8000000] [cohort=expanded|core]\n";
     return 2;
   }
   const auto trace=load(argv[1]);
@@ -108,7 +108,9 @@ int main(int argc,char** argv){
   if(runs<1||runs>100||warmup_bars<0||warmup_bars*3>=static_cast<int>(trace.size())||budget==0)
     throw std::invalid_argument("invalid runs/warmup/budget");
   const Key gold{"fixture","XAU","1m",Kind::Bar},silver{"fixture","XAG","1m",Kind::Bar},book{"fixture","XAU","live",Kind::Book};
-  const Graph graph=make_metal_graph(gold,silver,book);
+  const std::string cohort=(argc>=7?argv[6]:"expanded");
+  if(cohort!="expanded" && cohort!="core")throw std::invalid_argument("cohort must be expanded or core");
+  const Graph graph=make_metal_graph(gold,silver,book,cohort=="expanded");
   // Reference is generated independently and never shared with candidate state.
   Session oracle(graph);
   std::vector<Results> reference;

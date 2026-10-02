@@ -30,3 +30,7 @@ This document clarifies that MetalArch is a **continuation and systems-engineeri
 Preserved originals (SHA-256):
 - `paper/legacy/IEEE_RESEARCH_PAPER.md`: `5c653aa4bb91a8ef393bf5c0985fdb618de9d2fff197049437b9e8afb60f1ce5`.
 - `paper/legacy/IEEE_RESEARCH_PAPER.tex`: `6c7a3d1598a4cb269af89cdb38d2db12d16fef8fc4064365f557c2eb13c971e8`.
+
+## Further native workload extension, Phase III (2026-10-02)
+
+The experimental C++ reference graph can now run either its original 11 stages or an expanded **19-stage** set with eight source-audited mathematical feature adaptations (`docs/ENGINE_AUDIT.md`). This remains a selected cohort, not the complete original ASEP2 collection. `paper/METALARCH_DRAFT.md` marks the prior 11-stage ten-run pilot separately from the new 11-vs-19 three-run synthetic pilot. The expanded prototype does not yet establish hard CPU-budget or memory-budget guarantees or validated production market-feed semantics. Reproduce the per-cohort stages via `metalarch_cli inventory core|expanded` and the paired diagnostic via `benchmarks/run_study.py --cohort`.

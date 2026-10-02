@@ -78,13 +78,13 @@ void ingestion_tests(){
 void core_tests(){
  Session s(make_metal_graph(gold,silver,book));feed(s,1,70);
  int64_t now=T+70*STEP+3'000'000'000LL;
- auto ref=s.execute(now,false);CHECK(ref.size()==11);CHECK(ref.at("trend").mode==Mode::Simulated);
+ auto ref=s.execute(now,false);CHECK(ref.size()==19);CHECK(ref.at("trend").mode==Mode::Simulated);
  for(const auto& [id,r]:ref){CHECK(r.status==Status::Valid);CHECK(r.value.has_value());CHECK(r.identity!=0);CHECK(!r.lineage.empty());}
  CHECK(ref.at("momentum").value.value()>=0&&ref.at("momentum").value.value()<=100);
  CHECK(ref.at("peer_corr").value.value()>=-1&&ref.at("peer_corr").value.value()<=1);
  CHECK(std::abs(*ref.at("book_imbalance").value-1.0/3.0)<1e-14);
  auto first=s.execute(now,true);CHECK(normalized_result(first)==normalized_result(ref));
- auto second=s.execute(now,true);CHECK(s.hits()>=11);CHECK(normalized_result(second)==normalized_result(ref));
+ auto second=s.execute(now,true);CHECK(s.hits()>=19);CHECK(normalized_result(second)==normalized_result(ref));
  // Alter historical source while latest close is identical: new sequence should invalidate.
  auto old=s.store().version(gold);auto newest=bar(gold,71,122.0);newest.b=123.6;
  CHECK(s.store().ingest(newest)==Ingest::Accepted);CHECK(s.store().version(gold)==old+1);
@@ -153,7 +153,7 @@ void policy_tests(){
     CHECK(normalized_result(reference)==normalized_result(parallel));
     CHECK(normalized_result(reference)==normalized_result(cached));
     CHECK(b1.last_run().deferred==0);
-    CHECK(b1.last_run().execution_order.size()==11);
+    CHECK(b1.last_run().execution_order.size()==19);
     CHECK(b0.last_run().cache_hits==0);
     const auto again=b2.execute(t,Policy::Cache);
     CHECK(normalized_result(reference)==normalized_result(again));

@@ -14,9 +14,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = ["CMakeLists.txt", "include/metalarch/core.hpp", "include/metalarch/engines.hpp",
-           "src/core.cpp", "src/engines.cpp", "src/main.cpp", "benchmarks/compare.cpp",
-           "benchmarks/bench.cpp", "fixtures/make_fixture.py", "tests/test_core.cpp"]
+SOURCES = ["CMakeLists.txt", "include/metalarch/core.hpp", "include/metalarch/engines.hpp", "include/metalarch/legacy_extensions.hpp",
+           "src/core.cpp", "src/engines.cpp", "src/legacy_extensions.cpp", "src/main.cpp", "benchmarks/compare.cpp",
+           "benchmarks/bench.cpp", "benchmarks/run_study.py",
+           "benchmarks/run_budget_sweep.py", "benchmarks/plot_results.py", "fixtures/make_fixture.py", "tests/test_core.cpp", "tests/test_legacy.cpp"]
 
 
 def sha256(path: Path) -> str:
@@ -47,6 +48,8 @@ def quantile(values: list[float], q: float) -> float:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run all five MetalArch diagnostic policies")
     parser.add_argument("--trace", type=Path, help="Existing MA1 trace (default: generate synthetic)")
+    parser.add_argument("--cohort", choices=("core", "expanded"), default="expanded",
+                        help="11-stage original native graph or 19-stage ASEP2-expanded workload")
     parser.add_argument("--bars", type=int, default=300)
     parser.add_argument("--warmup-bars", type=int, default=65)
     parser.add_argument("--runs", type=int, default=10)
@@ -66,7 +69,7 @@ def main() -> None:
         parser.error(f"build comparison executable first: {exe}")
     raw_path = args.outdir / "events.csv"
     command = [str(exe), str(trace), str(raw_path), str(args.runs),
-               str(args.warmup_bars), str(args.budget_ns)]
+               str(args.warmup_bars), str(args.budget_ns), args.cohort]
     completed = subprocess.run(command, check=True, cwd=ROOT, capture_output=True, text=True)
     (args.outdir / "per_run.txt").write_text(completed.stdout, encoding="utf-8")
     rows = list(csv.DictReader(raw_path.open(encoding="utf-8", newline="")))
@@ -98,6 +101,7 @@ def main() -> None:
         "git_head": capture("git", "rev-parse", "HEAD"),
         "git_dirty": capture("git", "status", "--porcelain"),
         "source_sha256": {name: sha256(ROOT / name) for name in SOURCES},
+        "cohort": args.cohort, "registered_stages": 19 if args.cohort=="expanded" else 11,
         "trace_path": str(trace), "trace_sha256": sha256(trace),
         "csv_sha256": sha256(raw_path), "binary_sha256": sha256(exe),
         "platform": platform.platform(), "cpu": platform.processor(),

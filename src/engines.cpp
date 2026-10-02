@@ -1,7 +1,9 @@
 #include "metalarch/engines.hpp"
+#include "metalarch/legacy_extensions.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <iterator>
 #include <numbers>
 #include <stdexcept>
 #include <vector>
@@ -17,7 +19,7 @@ double ema(const EventWindow& v, size_t n){
 }
 double val(const Results& r,const std::string& id){return *r.at(id).value;}
 }
-Graph make_metal_graph(const Key& primary,const Key& peer,const Key& book){
+Graph make_metal_graph(const Key& primary,const Key& peer,const Key& book,bool include_legacy){
  constexpr int64_t BAR_TTL=120'000'000'000LL, BOOK_TTL=5'000'000'000LL;
  std::vector<Descriptor> d;
  d.push_back({"trend","ema-8-21-v1","fast=8;slow=21",{primary},{},BAR_TTL,[primary](const ReadView& s,const Results&){
@@ -100,6 +102,10 @@ Graph make_metal_graph(const Key& primary,const Key& peer,const Key& book){
    if(engine.id=="spectral") {engine.cadence=4;engine.estimated_cost_ns=4'000'000;}
    else if(engine.id=="peer_corr") engine.estimated_cost_ns=2'000'000;
    else if(engine.id=="fusion") engine.estimated_cost_ns=1'000'000;
+ }
+ if(include_legacy){
+   auto extensions=make_legacy_extensions(primary);
+   d.insert(d.end(),std::make_move_iterator(extensions.begin()),std::make_move_iterator(extensions.end()));
  }
  return Graph(std::move(d));
 }

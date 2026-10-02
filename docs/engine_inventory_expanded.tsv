@@ -1,0 +1,20 @@
+id	revision	parameters	inputs	parents	max_source_age_ns	max_result_age_ns	cadence	declared_cost_ns
+amihud20	asep2-amihud-native-v1	returns=20;denom=close*base_volume	fixture:XAU:1m:bar		120000000000	0	1	1000000
+atr	true-range-sma-v1	window=14	fixture:XAU:1m:bar		120000000000	0	1	1000000
+book_imbalance	top-of-book-imbalance-v1	snapshot=1	fixture:XAU:live:book		5000000000	0	1	1000000
+cci20	asep2-cci-native-v1	window=20;scale=0.015	fixture:XAU:1m:bar		120000000000	0	1	1000000
+cusum40	asep2-cusum-only-native-v1	returns=40;k=0.5;threshold=5	fixture:XAU:1m:bar		120000000000	0	1	1000000
+garman_klass20	asep2-garman-klass-native-v1	window=20;unit=per-bar	fixture:XAU:1m:bar		120000000000	0	1	1000000
+momentum	rsi-wilder-v1	period=14	fixture:XAU:1m:bar		120000000000	0	1	1000000
+parkinson20	asep2-parkinson-native-v1	window=20;unit=per-bar	fixture:XAU:1m:bar		120000000000	0	1	1000000
+peer_corr	pearson-matched-time-v1	returns=12	fixture:XAU:1m:bar,fixture:XAG:1m:bar		120000000000	0	1	2000000
+roc12	asep2-roc12-native-v1	lag=12;unit=percent	fixture:XAU:1m:bar		120000000000	0	1	1000000
+spectral	goertzel-concentration-v1	window=64;k=1..8	fixture:XAU:1m:bar		120000000000	0	4	4000000
+trend	ema-8-21-v1	fast=8;slow=21	fixture:XAU:1m:bar		120000000000	0	1	1000000
+forecast	illustrative-forecast-v1	weights=0.7,0.3		trend,momentum	120000000000	0	1	1000000
+volatility	realized-rms-v1	window=20	fixture:XAU:1m:bar		120000000000	0	1	1000000
+regime	heuristic-regime-v1	scale=100		trend,volatility	120000000000	0	1	1000000
+risk	heuristic-risk-v1	scale=100		volatility,atr	120000000000	0	1	1000000
+fusion	illustrative-fusion-v1	weights=0.3,0.2,0.2,0.2,0.1		regime,risk,forecast,peer_corr,book_imbalance	120000000000	0	1	1000000
+volume_obv30	asep2-obv-surge-adapted-v1	obv_window=30;surge_window=20	fixture:XAU:1m:bar		120000000000	0	1	1000000
+williams_r14	asep2-williams-r-native-v1	window=14;unit=percent	fixture:XAU:1m:bar		120000000000	0	1	1000000

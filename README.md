@@ -14,7 +14,7 @@
 
 A typed `Descriptor` declares inputs, required parents, revision, parameters, source age, result age, cadence and nominal compute estimate. Missing dependencies, cycles and inconsistent descriptors fail early. Input keys include source, symbol, timeframe and kind. The ingestion store rejects non-finite/invalid events, sequence/time inversions, conflicting duplicates and invalid provenance modes, retains bounded history through an O(1)-overwrite contiguous ring (default 4,096 events/stream), and exposes versioned rolling-content identity. Engines can read only declared sources. Downstream failures and provenance propagate explicitly. The source fingerprint uses a fast **non-cryptographic** digest; the manifest separately uses SHA-256 for artifact integrity. Ingest and evaluation must be serialized within one Session.
 
-**Eleven initial stages:** EMA trend, Wilder RSI, realized RMS volatility, ATR, timestamp-matched Pearson correlation, top-of-book imbalance, Goertzel spectral concentration, and illustrative regime, risk, forecast and fusion. The last four are *heuristic test stages*, not validated predictions or probability estimates. Source modes are OBSERVED/ESTIMATED/SIMULATED; generated fixture data are exclusively SIMULATED.
+**Workload selection:** the original 11-stage core remains accessible as `core`. The default `expanded` cohort contains **19 stages**: the core plus eight independently implemented ASEP2-derived C++ methods (ROC(12), Williams %R(14), CCI(20), Parkinson(20), Garman–Klass(20), Amihud(20), OBV/volume surge(30), and CUSUM(40)). These are audited *adaptations*, not an assertion that all legacy engines or their old combined normalized scores have been reproduced. The four inherited heuristic core nodes remain illustrative, not validated forecasts. Both cohorts use the same events, scheduler implementation and source/provenance contract. Source modes are OBSERVED/ESTIMATED/SIMULATED; generated fixture data are exclusively SIMULATED. See `docs/IMPLEMENTATION_PHASE3.md` and `docs/ENGINE_AUDIT.md` for definitions and edge cases.
 
 ## Build and verify
 
@@ -23,6 +23,7 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ./build/metalarch_tests
+./build/metalarch_legacy_tests
 
 # GCC/Clang sanitizer configuration
 cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DMETALARCH_SANITIZE=ON
@@ -44,9 +45,23 @@ python3 fixtures/make_fixture.py --bars 70 --output fixtures/synthetic_70.ma1
 ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > scheduled.txt
 ```
 
-CLI policies: `b0`, `b1`, `b2` (default), `b3`, `p`. Replay uses the same execution implementations as interactive sessions with a controlled input clock, not a reconstruction of engine-score telemetry. Exact same-platform replay is tested; cross-platform bitwise agreement is not guaranteed.
+CLI policies: `b0`, `b1`, `b2` (default), `b3`, `p`. A final optional `core|expanded` argument selects the registered cohort; `expanded` is the default. The CLI can also report an inspectable workload inventory with `./build/metalarch_cli inventory core` or `./build/metalarch_cli inventory expanded`. Replay uses the same execution implementations as interactive sessions with a controlled input clock, not a reconstruction of engine-score telemetry. Exact same-platform replay is tested; cross-platform bitwise agreement is not guaranteed.
 
-## Five-policy diagnostic benchmark
+## Cohort-scaled diagnostic (Phase III)
+
+Compare the 11-stage and 19-stage cohorts on the same deterministic fixture:
+
+```bash
+python3 benchmarks/run_study.py --bars 300 --runs 3 --warmup-bars 65 \
+  --cohort core --budget-ns 8000000 --outdir artifacts/core
+python3 benchmarks/run_study.py --bars 300 --runs 3 --warmup-bars 65 \
+  --cohort expanded --budget-ns 8000000 --outdir artifacts/expanded
+python3 benchmarks/plot_results.py artifacts/expanded/events.csv --outdir artifacts/expanded/figures
+```
+
+The benchmark manifest includes cohort name, dynamically verified stage count, SHA-256 for every native source and trace, and exact commands. Never directly compare a policy's absolute latency on **different engine cohorts** as though their computational workloads are equal. See `docs/IMPLEMENTATION_PHASE3.md`. This study remains synthetic and does not enforce a real CPU/memory budget; P charges descriptor-declared nominal costs.
+
+## Prior Phase II eleven-stage diagnostic benchmark
 
 ```bash
 python3 benchmarks/run_study.py --bars 300 --runs 10 --warmup-bars 65 \
@@ -57,7 +72,7 @@ Output: `events.csv`, `summary.json`, `manifest.json`, `per_run.txt` and a SHA-2
 
 ## Paper continuity (ASEP2 → MetalArch)
 
-The **primary integrated continuation manuscript** is [`paper/METALARCH_DRAFT.md`](paper/METALARCH_DRAFT.md). It builds directly on the June 2026 ASEP2 paper instead of treating MetalArch as an unrelated terminal. The historical paper is preserved verbatim in [`paper/legacy/IEEE_RESEARCH_PAPER.md`](paper/legacy/IEEE_RESEARCH_PAPER.md) and [LaTeX](paper/legacy/IEEE_RESEARCH_PAPER.tex). The original MetalArch systems-only draft remains in [`paper/archive/METALARCH_SYSTEMS_DRAFT_2026-10-02.md`](paper/archive/METALARCH_SYSTEMS_DRAFT_2026-10-02.md). See [`paper/CONTINUATION_MAP.md`](paper/CONTINUATION_MAP.md) for a section-by-section crosswalk distinguishing Phase I inherited work, Phase II implemented additions, preliminary experiments, and planned publication work. Publication claims remain evidence-gated.
+The primary [`paper/METALARCH_DRAFT.md`](paper/METALARCH_DRAFT.md) directly extends the ASEP2 Metals Terminal paper. The historical originals are preserved verbatim in [`paper/legacy/IEEE_RESEARCH_PAPER.md`](paper/legacy/IEEE_RESEARCH_PAPER.md) and [LaTeX](paper/legacy/IEEE_RESEARCH_PAPER.tex), while the earlier standalone systems draft is retained in [`paper/archive/METALARCH_SYSTEMS_DRAFT_2026-10-02.md`](paper/archive/METALARCH_SYSTEMS_DRAFT_2026-10-02.md). `paper/CONTINUATION_MAP.md` distinguishes original work, native implementation, and planned publication evaluation.
 
 ## Research integrity and history
 
