@@ -2,6 +2,10 @@
 
 **Research prototype: C++20 dependency-aware streaming analytics core.** It is a new implementation, not a rename of ASEP2, a production brokerage system, a validated forecasting model, an established patent, or a completed publication.
 
+## Full expansion roadmap
+
+See the [100× capability expansion master plan](docs/ROADMAP_100X.md). It separates the publication-critical constrained-resource system study from longer-term ASEP2 feature migration, UI, source adapters and optional research modules. Listed candidates are *not* completed implementations, demonstrated 100× speedups or established inventions.
+
 ## Implemented execution modes
 
 | Policy | Behaviour |
