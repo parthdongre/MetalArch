@@ -1,121 +1,171 @@
-# MetalArch: Dependency-Correct Execution, Explicit Provenance, and Recorded-Input Replay for a Local Financial Analytics Pipeline
+# From Metals Terminal to MetalArch: Resource-Constrained Execution of a Multi-Engine Precious-Metal Research System
 
-**Manuscript status (2 October 2026): systems-method draft, not publication-ready. A first budget/deadline scheduler and five-policy **synthetic diagnostic** have now been implemented; a publication-quality empirical study remains unfinished. No claim of patentability, novelty, predictive accuracy or statistically significant performance benefit is made.**
+**Status:** Integrated continuation manuscript, 2 October 2026. Working academic draft—not a published paper or a claim of proven novelty, patentability, or production performance. Quantitative MetalArch findings below are limited to an initial **synthetic diagnostic**. Preserve the source manuscript without silently rewriting its historical claims.
 
-**Historical ASEP2 manuscript authors, original order (confirm contributions, inventorship if relevant, and affiliations before any submission):** Ramakrishna Bharsakde, Parth Dongre, Parth Birari, Atharv Patil, Aryan Patil. Original paper affiliation: Department of Engineering, Sciences and Humanities, Vishwakarma Institute of Technology, Pune, India. The revised manuscript must not silently treat the historic author list as a confirmed new-paper contribution statement.
+**Historical ASEP2 author order (retain as provenance; confirm the revised paper's individual contributions and affiliations with all authors before submission):** Ramakrishna Bharsakde, Parth Dongre, Parth Birari, Atharv Patil, Aryan Patil.  
+**Original affiliation:** Department of Engineering, Sciences and Humanities (DESH), Vishwakarma Institute of Technology, Pune, Maharashtra, India.  
+**Project lineage:** F.Y.B.Tech ASEP2, semester 2 A.Y. 2025–26 (Metals Terminal, June 2026) → MetalArch software-systems extension (October 2026). The unmodified originals are retained under `paper/legacy/` in this repository.
 
-## Abstract — provisional; update after full study
+## Abstract — provisional
 
-Multi-engine analytics applications often couple heterogeneous market inputs, numerical procedures, and derived outputs. Reusing intermediary results can reduce repeated computation, but a short input fingerprint or a manually ordered engine pipeline can silently invalidate dependent outputs. We describe the implementation of a C++20 reference prototype, MetalArch, that validates a declared engine graph, enforces source-read declarations, uses session-local and source-version-aware caching, and records explicit source provenance and analytical result status. A versioned synthetic input trace is replayed through the same analytical execution path as interactive evaluation. The initial implementation includes eleven representative computational and illustrative workload stages. Correctness-oriented unit and differential checks are provided, alongside a limited local five-policy diagnostic. B1 adds dependency-wave concurrency with cost-aware thread granularity; B3 explicitly marks cadence-deferrals stale; P uses a deterministic deadline-slack ready queue under a declared nominal-cost budget. An observed-trace and controlled-load evaluation remains required before claiming a scheduling advantage.
+Our previous ASEP2 project, *Metals Terminal*, developed a local multi-engine research environment for precious-metal analysis. Its scope included historical and streaming market-data interfaces, quantitative engines spanning several analytical families, result fusion, telemetry, a browser-based interface, and optional native acceleration. The original paper demonstrated an integrated research application and identified efficient operation on local undergraduate hardware as a non-functional requirement. Extending that work exposed a more specific problem: heterogeneous engines require different inputs and computation times, yet a resource-constrained machine must manage dependency ordering, recomputation, output age, and degraded sources without presenting reused or unavailable results as current evidence. This continuation paper describes MetalArch, an experimental C++20 analytical core that treats these properties as explicit execution contracts while retaining the previous terminal's precious-metal workload as its application foundation. The implemented prototype contains eleven representative stages and five execution policies: sequential full recomputation (B0), dependency-wave parallel execution (B1), version-aware caching (B2), explicitly stale fixed cadence (B3), and a preliminary nominal-budget/deadline policy (P). A first ten-repeat synthetic diagnostic finds numerical and status agreement among B0/B1/B2 at matched input cuts, lower repeated computation under B2, and no demonstrated advantage for P over B2 at the chosen nominal budget. This is a foundation for a later controlled resource-budget and recorded-observation study, not a completed demonstration of scheduling superiority or predictive market quality.
 
-**Keywords:** stream analytics; dependency graph; cache correctness; freshness; provenance; deterministic replay; reproducibility; precious metals.
+**Keywords:** precious-metal research terminal; resource-constrained systems; heterogeneous analytics; dependency graph; selective recomputation; provenance; freshness; C++20; reproducible replay.
 
-## 1. Motivation and scope
+## I. Introduction: Continuation of the Previous Semester's Work
 
-The legacy ASEP2 Metals Terminal developed a broad collection of financial analyses and a web-based research interface. A separately supplied historical archive, rather than the connected GitHub main revision, contains a paper describing 71 registered engines and 38 passing tests. An independent handoff records a later local run of 92 passes with two warnings, and static inspection of that archive identifies 58 distinct imported registrations. These are **historical, revision-specific counts**, not MetalArch claims. The legacy orchestrator grouped engines into hand-assigned layers while dependency declarations were not the source of execution ordering; its cache used a small primary-frame fingerprint, and a global cadence could reuse results based on engine name without full context verification. Missing parents could be represented as default-scored results. These observations motivated a clean, limited system implementation rather than uncritical inheritance of the original engine collection.
+The original ASEP2 manuscript, *A Real-Time Multi-Engine Research Terminal for Precious-Metal Market Intelligence* (June 2026), addressed whether a local undergraduate engineering project could combine market ingestion, microstructure, technical indicators, statistical analysis, interpretable visualization, validation-related tooling, and desktop-oriented distribution without relying on external compute infrastructure. Its stated outcome was not automated trading or a proven forecasting model. Rather, it built an integrated research instrument in which independent analyses could be inspected and summarized. The original manuscript's stated data configuration centered on `XAUUSDT` and `XAGUSDT`; actual present-day exchange availability, data rights and instrument semantics have **not** been independently verified for MetalArch.
 
-MetalArch deliberately selects a small engineering workload to permit analytical correctness to be audited. No observed market feed, actual macroeconomic measurement, predictive performance or real-world exchange instrument semantics have yet been validated in this new implementation. Generated fixture events are labeled SIMULATED. This manuscript is about **software-system properties**, not a recommendation to trade gold or silver.
+The present study **continues, rather than replaces**, that problem. The first version emphasized the breadth and integration of analysis; this version studies the cost and correctness of executing such analysis on bounded resources. Adding more indicator families does not by itself answer whether a multi-engine system can preserve reliable outputs when several inputs change at different rates, expensive nodes lag behind, and the execution budget is insufficient for full recomputation. Nor can a fast cached output be taken as correct merely because the terminal responds promptly. These observations lead to the continuation question:
 
-## 2. Research questions and hypotheses
+> Under a fixed local resource budget, what computational work can be eliminated from the existing multi-engine analytical workflow, and what freshness or analytical availability is sacrificed, while maintaining explicit dependency and output-validity contracts?
 
-**RQ1 (reference correctness).** Does descriptor-derived execution and cache invalidation preserve status and numerical output agreement with sequential uncached computation for equivalent source cuts? The test oracle must distinguish changes in peer/book inputs, declared parameters and required upstream results.
+**Scope:** This is a software-systems study with precious-metal analytics as its concrete inherited workload. Numerical market prediction, trading profitability, and claims of privileged data coverage are not used as systems-performance evidence.
 
-**RQ2 (freshness/compute trade-off; preliminary implementation, study pending).** At equal source cuts, defined freshness limits and controlled load, what computation cost, latency, output age and decision disagreement are produced by (B0) sequential full recompute, (B1) parallel full recompute, (B2) selective caching, (B3) fixed cadence with explicit stale values, and (P) a freshness-aware scheduler? There is **no presupposed winning policy**.
+## II. Phase I Foundation: Metals Terminal (ASEP2, June 2026)
 
-**RQ3 (recorded-input repeatability).** Under a pinned binary, virtual evaluation times and documented event ordering, can recording/replaying inputs reproduce the sequence of normalized output values, statuses and lineage identities?
+This section preserves the main organization and substance of the earlier paper. Its implementation descriptions are **historical**, not claims that the same frontend or complete engine set has been migrated to the current MetalArch branch.
 
-**RQ4 (provenance).** Are observed, estimated and simulated upstream inputs distinguishable and can failed, unavailable and stale parents be prevented from masquerading as valid neutral evidence?
+### A. Market analysis framework retained from ASEP2
 
-## 3. Formal model and contracts
+Metals Terminal treated evidence from multiple families as complementary rather than allowing a single indicator to dominate. The original framework asked whether the market was trending, ranging, or reversing; whether momentum was supported by participation and order flow; whether volatility and tail-risk were changing; whether spreads and available liquidity supported the observed movement; and how conclusions changed under adverse market scenarios. Its engine families included trend/momentum, volatility/risk, microstructure/volume, regime/changepoints, spectral/complexity, cross-asset/systemic analysis, forecasting/macro/sentiment, and downstream signal fusion. **These families remain the application-level design and workload-selection basis for MetalArch.** A numeric score in the prior interface was an interpretative display convention, not proof of calibrated predictive probability.
 
-Let the analytical graph be a directed acyclic graph \(G=(V,E)\), with each vertex \(i\) an analytical stage and an edge \((j,i)\) whenever stage \(i\) requires the output of stage \(j\). Each stage additionally declares a set of direct source streams \(S_i\), immutable implementation revision and parameter representation. A source stream is identified by provider, instrument, timeframe and kind (bar or book). At evaluation time \(t\), a stage may compute
+### B. Earlier engineering architecture
+
+The previous manuscript describes a Python `metals` package, configurable REST/WebSocket data sources, an engine registry, an orchestrator producing result bundles, snapshot serialization, a FastAPI/WebSocket backend, browser-based chart panels, local telemetry/storage, Monte Carlo controls, and optional C++ kernels. The original paper also discusses bounded tick storage, slower engine cadence and desktop packaging as ways of maintaining local usability. These were meaningful project deliverables and motivate the computational constraints investigated here. The historical manuscript and original source remain independently archived for reproducibility and attribution.
+
+### C. Historical evidence boundary
+
+The original June manuscript states **71 registered engines** and **38 passing automated tests** for its reported version. An independently supplied later local review records **92 passes and two warnings** in that reviewer environment; inspection of its imported registry finds **58 distinct registered engines** in that particular local snapshot. The connected ASEP2 GitHub `main` is another revision. These facts must not be combined into a single current count, and none is a MetalArch benchmark. Exact prior capabilities, native speedups and installer-signing statements should be reverified against a pinned legacy release before repeated as established measurements. The archived original, including its original wording, is retained at `paper/legacy/IEEE_RESEARCH_PAPER.md` and `.tex`; a separate legacy audit describes revision-specific discrepancies.
+
+## III. Problem Identification from Phase I
+
+The earlier paper's non-functional requirements explicitly included local operation, controlled memory, deferring expensive engines, a responsive interface, testability and graceful handling of missing external sources. Its section on runtime efficiency proposed capped thread counts and workers, bounded queues, and slow-engine reuse. The extension arises directly from these previous requirements, not from an unrelated scheduling problem.
+
+A subsequent code audit of the provided legacy snapshot identified four relevant implementation limitations:
+
+1. **Dependency ordering.** Registered `requires` relationships were not the source of the hand-assigned layer schedule. Several declared parents were assigned to the same or a later layer, so downstream computations could observe absent upstream results.
+2. **Cache correctness and isolation.** A short fingerprint containing primary-frame length, latest timestamp and rounded latest close did not identify all relevant peer, book, window, parameter and parent changes. Global memoization/cadence could also reuse a context-incompatible result.
+3. **Validity and freshness.** A missing or failed parent could be replaced by a default `EngineResult` with a neutral score. An apparently ordinary numerical output therefore did not always distinguish a valid neutral state from unavailable evidence.
+4. **Reproducibility.** The later legacy replay reconstructed output-like bundles with empty frames rather than replaying original input events through the production dependency path. The original walk-forward/ML claims also need separate revalidation if predictive quality is discussed.
+
+These are findings for the **inspected historical revision**, not an assertion that none of ASEP2's integration achievements existed. They motivate a principled execution-layer redesign while retaining the application and prior paper's engineering contribution.
+
+### Formal resource-constrained execution model
+
+Let the analytical workload be a directed acyclic graph \(G=(V,E)\), where node \(i\) has declared sources \(S_i\), parents \(\operatorname{pred}(i)\), parameters \(\theta_i\), a source-age limit, a result-age limit and an estimated cost \(\hat c_i\). A current computation is
 
 \[
- y_i(t) = f_i( X_{S_i}(t),\ \{y_j(t):j\in\operatorname{pred}(i)\};\ \theta_i ).
+y_i(t)=f_i\left(X_{S_i}(t),\{y_j(t):j\in\operatorname{pred}(i)\};\theta_i\right).
 \]
 
-A valid computation requires the declared sources to have arrived by \(t\), all required parents to be valid, and an age contract to hold. Source event time and ingestion time are separately retained; knowing an event's event timestamp alone is insufficient to establish that it was causally observable. A result has one of four statuses: VALID, STALE, UNAVAILABLE, FAILED. A missing value is represented by absence, **not** a score of 50. Source lineage carries observed/estimated/simulated mode and per-stream version/content identity. Derived numerical values remain estimates even if their source readings are observed.
+Input events have distinct event and ingestion timestamps. A node cannot consume a measurement that has not arrived by its logical evaluation cut, and an expired or failed required parent cannot silently supply a numerical value as fresh evidence. For any execution policy \(\pi\), the study records actual computations, local processing latency, output-validity distribution and age, CPU/memory, and disagreement from correct full recomputation at matched cuts. The evaluation should examine the trade-off under explicitly controlled CPU, memory and nominal or measured scheduling budgets, **without assuming a policy must win on every metric**.
 
-The current prototype forms a per-stage cache identity by combining engine ID, revision and parameter representation, declared age contract, source keys and their versions/rolling digests, and each declared parent's identity/status/mode. Versions are incremented on accepted source events and kept local to a Session. Its rolling digest is an FNV-style non-cryptographic identity aid; it is **not** a secure signature or an artifact integrity guarantee. Trace packages require SHA-256 from the release process. A retained cached result is also subject to the current freshness check before reuse.
+## IV. Phase II Objectives and Research Questions
 
-## 4. Implementation
+This continuation studies:
 
-### 4.1 Event ingestion and retention
+- **RQ1 — Dependency and cache correctness:** Can derived DAG execution and complete declared-input/parent identities preserve normalized results against an uncached oracle on equal input cuts?
+- **RQ2 — Constrained execution:** When event arrival rate, compute budget or available workers are constrained, how do sequential full, parallel full, selective caching, fixed cadence and deadline-aware selection differ in real compute work, output age and availability?
+- **RQ3 — Reproducibility:** Can recorded *inputs* reproduce the same normalized result/status sequence through the actual analytical path under a controlled logical clock?
+- **RQ4 — Evidence integrity:** Can observed, estimated and simulated input lineage and explicit status prevent failed, missing or intentionally stale values from appearing as valid neutral evidence?
 
-MetalArch has a standard-library-only C++20 computational core. Its MA1 text format encodes a version tag, kind, provider/instrument/timeframe identity, sequence, event nanoseconds, ingestion nanoseconds, five numeric payload fields, and provenance mode. Records with non-finite numbers, invalid OHLC or book constraints, conflicting duplicate latest sequence numbers, and decreasing sequence, event or per-stream ingestion timestamps are rejected. Exact latest-sequence duplicates are idempotent. The current source store retains a configurable contiguous circular history (default 4,096 events/stream) with O(1) overwrite on capacity; minimum capacity is 65 for the sample engine cohort. It does not yet implement late-event corrections, real market depth reconstruction or a durable append-only ingestion service.
+The intended incremental contribution is **not** the invention of EMA, RSI, a generic DAG, or ordinary caching. It is the implementation and reproducible evaluation of their interaction in the existing precious-metal terminal's heterogeneous, resource-bounded setting. The exact research gap and any stronger novelty claim remain subject to a sourced related-work review.
 
-### 4.2 Dependency execution and cache scope
+## V. MetalArch Extension Architecture and Implementation Status
 
-Registration rejects duplicate stage IDs, unknown/self/duplicate required dependencies, duplicate declared direct inputs and cycles. Kahn's topological algorithm with stable lexical tie breaking produces the sequential reference order. A ReadView checks every attempted source read against the descriptor allowlist; engines receive only their declared parent results. Exceptions become FAILED results and cannot silently pass as valid. If a direct source becomes stale or a required parent is invalid, downstream computation does not proceed as if its numerical output were current. Each Session has an independent source store, cache and counters. External concurrent writes into an executing Session are not currently supported; callers must serialize ingestion and evaluation.
+The previous system can be understood as: **market adapters → engine orchestration → result bundle/fusion → FastAPI/WebSockets → browser/desktop interface**. The MetalArch extension targets the middle computational seam:
 
-### 4.3 Representative workload and algorithms
+```text
+ASEP2 application foundation (historical; production bridge pending)
+  Data adapters / precious-metal analytical families / research UI
+                           |
+             versioned source-event boundary
+                           v
+MetalArch native execution core (implemented C++20 prototype)
+  source validation + bounded event history + lineage
+                           |
+   descriptor-derived DAG + B0 reference executor
+                           |
+     B1 parallel  B2 cached  B3 cadence  P budgeted
+                           |
+       VALID / STALE / UNAVAILABLE / FAILED results
+                           |
+         replay + benchmark artifact outputs
+                           v
+  planned integration with original terminal's snapshot/API/UI
+```
 
-This limited cohort was chosen to exercise distinct input costs and dependency patterns rather than maximize indicator count. Direct bar analyses are EMA(8/21) trend, Wilder RSI(14), 20-return root-mean-square log volatility and 14-period simple-average true range. Cross-asset analysis uses Pearson correlation on matched current **and preceding** bar timestamps; it returns unavailable when there are too few matched returns or a constant series. Book imbalance uses the latest top-of-book bid/ask quantities. Spectral concentration is estimated by applying the Goertzel recurrence to eight bins of 64 demeaned log returns; it is **not** represented as wavelet coherence.
+**No complete ASEP2-to-MetalArch production adapter or full frontend migration has yet been tested.** Reuse of the previous terminal remains a specified integration objective, not a completed Phase II deliverable.
 
-The derived regime/risk/forecast/fusion stages apply declared deterministic heuristic functions. In particular, the component named `forecast` is an **illustrative weighted formula**, not a deployed or calibrated predictive model, and the fusion result is not a trading probability. Mathematical definitions and minimum-data constraints are itemized in `docs/ENGINE_AUDIT.md` alongside the source. The B0 oracle is sequential. B1 executes independent dependency waves using a session-owned worker pool, using a serial path when tasks are too small to amortize synchronization overhead. B2 reuses compatible valid results subject to both source and computation age. B3 offers corrected fixed cadence with a separate last-known display value, never as current evidence. P uses deadline-slack priority, ancestor deadline inheritance and estimated critical-path costs in a deterministic ready queue. Estimated scheduling costs are declared initial inputs, **not** independently calibrated service-time measurements. In the current P policy, deferral does not guarantee less total computation than B2.
+### A. Native computational core and selected inherited workload
 
-### 4.4 Replay semantics
+The current C++20 prototype exposes eleven representative stages chosen from the earlier family taxonomy. Its direct calculations include EMA(8/21) trend, Wilder RSI(14), RMS realized log-return volatility, average true range, timestamp-matched Pearson correlation for the peer, top-of-book volume imbalance and Goertzel spectral concentration. Four dependent heuristic stages—regime, risk, illustrative forecast and fusion—exercise downstream graph behavior. This *representative cohort* is deliberately smaller than the historical ASEP2 inventory; it is the measured Phase II workload, not a claim that all earlier analyses have been ported or that the illustrative forecast is empirically calibrated.
 
-The replay CLI parses MA1 lines, inserts accepted records through Store::ingest and executes the ordinary graph at each accepted event's ingestion timestamp. The normalized result text includes deterministic stage ID, status, source-input mode, optional numerical value, source timestamp, computation identity and reason; wall-clock benchmark telemetry is deliberately excluded from its equality comparison. Two runs on the same Linux build using a deterministic 210-event synthetic fixture produced identical output SHA-256 values (see below). This is a limited replay property, not an assertion of cross-platform floating-point bit identity or faithful live-feed reconstruction.
+### B. Dependency, source and state contracts
 
-## 5. Initial verification and limited diagnostic results
+A typed descriptor declares direct source streams, required upstream nodes, implementation revision, parameter identity and source/result age constraints. Registration rejects duplicate IDs, unknown/duplicate/self dependencies and cycles. The reference engine uses a deterministic topological order. Session-local stores have bounded event histories and versioned source-content identities; source reads are limited to the descriptor's declared inputs. Result cache identity combines engine/parameter/implementation identity, declared source revisions and upstream result identity, with independent age validation. Explicit result states are VALID, STALE, UNAVAILABLE and FAILED. Source provenance distinguishes OBSERVED, ESTIMATED and SIMULATED; in the fixture below all generated market observations are SIMULATED.
 
-All measurements in this section are **implementation smoke evidence**; they cannot resolve RQ2, predictive value or novelty.
+### C. Five execution policies
 
-### 5.1 Correctness tests
+| Label | Implemented Phase II policy | Role in extension |
+|---|---|---|
+| B0 | Sequential, uncached, dependency-correct full recomputation | Reference against which candidates are compared |
+| B1 | Dependency-wave parallel executor with persistent bounded workers and serial granularity fallback | Tests whether concurrent independent work is useful |
+| B2 | Dependency-correct cache-aware recomputation subject to input/result-age limits | Tests repeated-work elimination without intentional output deferral |
+| B3 | Correct fixed cadence with explicit last-known STALE display metadata | Evaluates the cadence concept already raised in the ASEP2 paper |
+| P | Preliminary deterministic deadline-slack/critical-path ready queue under a declared nominal budget | Investigates resource-conditioned output selection |
 
-The release-mode GCC 14.2.0 and Clang 17 builds passed the native suite with **1,241 assertions across five test groups**. The same suite also completed under GCC AddressSanitizer and UndefinedBehaviorSanitizer in Debug mode. The checks cover topological ordering/cycle and undeclared dependency rejection, ingestion constraints and bounded retention, cache-versus-reference agreement, source and book-specific invalidation, session/reset isolation, an ingestion-time causality restriction, age expiry and status propagation, deliberate failure injection, and replay equivalence. This is not a proof of complete mathematical correctness or production fault tolerance.
+The P cost estimates are **initial declared modeling inputs**, not yet a calibrated operating-system CPU or memory enforcement mechanism. The current prototype does not guarantee less computation or lower latency than B2.
 
-For the 210-event wholly synthetic trace (`fixtures/synthetic_70.ma1`), two independent CLI replay outputs matched byte-for-byte on the tested build. SHA-256 of each normalized output was:
+### D. Replay and artifacts
 
-`e4e343ab4af23dc26b44adfdd77109d1d93afcd07fd6533bc6b42a5aaf4c10ae`.
+The versioned MA1 trace records the source type, provider, symbol, timeframe, sequence, event time, ingestion time, numerical payload and provenance mode. Recorded events travel through the same source ingestion and policy execution paths as other session evaluations. The replay comparison deliberately excludes nondeterministic wall-clock profiling fields from normalized equality. Full market WebSocket capture, network fault recovery and multi-platform bitwise floating-point identity are **not yet established**. Raw performance artifacts and trace/source hashes are maintained separately from the paper's narrative.
 
-### 5.2 Synthetic B0/B2 smoke timing
+## VI. Experimental Method and Initial Evidence
 
-On a Linux x86_64 container reporting AMD EPYC 9V74 and GCC 14.2.0, ten consecutive runs of 300 timestamps with three simulated inputs per timestamp and two analytical evaluations per cut produced the following local timings. The measurement includes source generation/ingestion and computation, excludes network and I/O, and uses *no* controlled CPU pinning, randomized baseline order or confidence intervals.
+### A. Historical achievement versus new measurement
 
-| Policy | Median total elapsed time per 300-cut repeated-evaluation run | Min–max across 10 runs | Computations across all 10 runs | Cache hits |
+Earlier ASEP2 results demonstrate the reported *scope of an integrated terminal* (ingestion, analysis, serving, visual presentation, telemetry, optional acceleration). The current experiments instead measure the redesigned execution seam. They do **not** re-establish the prior paper's 71-engine claim, predictive value, live exchange semantics or desktop signing. Source claims remain version-bound.
+
+### B. Initial Phase II verification
+
+The completed local test suite reported **4,691 assertions across eight groups**, with three CTest targets passing under GCC Release, GCC ASan/UBSan Debug and Clang Release; a subsequent GitHub Actions matrix for the implementation branch succeeded on Ubuntu/GCC, Ubuntu/Clang and macOS/Clang. Tests cover DAG rejection, source contract enforcement, cache invalidation, result-status propagation, cadence deferral, policy comparison, session isolation and replay. These are implementation checks, not a proof of real-time production bounds. Independent 210-event synthetic P-policy CLI replays yielded an identical normalized output SHA-256 in the tested environment: `4c11150a5cd341b618d3fc397430bfc5ce15c978b8de54354f67a22927118821`.
+
+### C. Initial five-policy diagnostic — synthetic only
+
+The exploratory experiment uses a 300-bar, three-stream simulated workload, ten repetitions per policy, 65 warm-up bars, and 7,050 recorded event observations per policy. The results below are local ingestion-plus-computation times in a shared container, **not** controlled CPU quotas or observed live-feed end-to-end latency. All data are synthetic; measurements and the exact script are documented in `benchmarks/observations/`, `benchmarks/run_study.py` and `docs/BENCHMARK_NOTES.md`.
+
+| Policy | p50 local time (µs) | p95 local time (µs) | Engine computations (10 runs) | Explicit deferrals |
 |---|---:|---:|---:|---:|
-| B0 sequential full | 8.934 ms | 8.617–9.606 ms | 64,400 | 0 |
-| B2 session-local cache | 7.476 ms | 7.335–8.898 ms | 33,650 | 30,750 |
+| B0 full | 22.35 | 26.40 | 68,150 | 0 |
+| B1 parallel | 24.15 | 33.39 | 68,150 | 0 |
+| B2 cached | 17.36 | 26.79 | 28,200 | 0 |
+| B3 cadence | 17.76 | 26.25 | 27,610 | 3,540 |
+| P nominal budget = 8,000,000 | 21.98 | 27.78 | 28,200 | 4,700 |
 
-Both policies produced the same *rounded diagnostic numeric sink* (1372.329). Separate differential tests check normalized equality on shared input cuts. Since the benchmark intentionally repeats each snapshot, it grants B2 obvious reuse opportunities and cannot establish scheduling superiority or a meaningful speedup under live workload distributions. All sources in this benchmark were explicitly SIMULATED. `benchmarks/local_smoke_2026-10-02.txt` and `docs/BENCHMARK_NOTES.md` give the exact diagnostic outputs and caveats.
+B0, B1 and B2 agreed in normalized status and valid numerical values at matched cuts in this fixture; the recorded B3/P status differences are intentionally disclosed STALE outputs, not silent cache corruption. No output marked VALID violated its declared source-age limit in this specific test. On this low-cost workload, B1 was not faster than sequential B0. At the selected nominal budget, P deferred more outputs than B2 **without reducing computation count**. A short exploratory budget sweep offers feasibility data, but the present experiments do not demonstrate that P improves the constrained-resource trade-off. Pooled microsecond timing from this one environment is not a publication-grade systems evaluation.
 
-### 5.1 Expanded synthetic diagnostic (2 October 2026)
+Trace SHA-256: `d171a78b429ea06d6bd488e01bd62e8bb49bfc686ef4668d47dad05fd0978f1d`. The main raw CSV SHA-256 recorded by the prior study: `139838863e414738f507cf6e109d3d1a2d7c2e05f39804337601bd01636f3635` (raw CSV distributed in the separate phase-two source-and-results package; regenerate from the script).
 
-A later prototype build ran B0, B1, B2, B3 and P on the **same 300-bar, three-stream simulated fixture**. Each configuration was repeated ten times in alternating policy order, with the first 65 bars treated as warm-up; 7,050 event observations per policy were retained. A source-and-binary manifest, raw per-event CSV and a JSON summary were generated using `benchmarks/run_study.py` (trace SHA-256 `d171a78b429ea06d6bd488e01bd62e8bb49bfc686ef4668d47dad05fd0978f1d`). These are local, shared-host timings, not stable production latency or a real market study.
+### D. Experiments required before stronger conclusions
 
-| Policy | P50 local ingestion-plus-execution (µs) | P95 (µs) | Compute invocations across 10 runs | Explicit deferrals | Status differences from B0 |
-|:--|--:|--:|--:|--:|--:|
-| B0 | 22.35 | 26.40 | 68,150 | 0 | 0 |
-| B1 | 24.15 | 33.39 | 68,150 | 0 | 0 |
-| B2 | 17.36 | 26.79 | 28,200 | 0 | 0 |
-| B3 | 17.76 | 26.25 | 27,610 | 3,540 | 3,540 |
-| P | 21.98 | 27.78 | 28,200 | 4,700 | 4,700 |
+The next evaluation must vary *measured or enforced* CPU limits, memory caps, instrument/event rates, engine cost distributions, worker counts, source delay and deadlines while holding the input trace/evaluation cuts constant across policies. The benchmark should report local p50/p95/p99, sustained rate, real CPU use, peak/steady memory, recomputation counts, source/output ages, missed freshness contracts, explicitly deferred slots, numerical disagreement with B0, scheduler overhead, bounded overload behavior and failure recovery. Add expensive original-family engines (for example spectral, volatility and cross-asset cases) with validated mathematics instead of increasing indicator count for appearance. Recorded observed-source traces require verified venue definitions, timestamps, acquisition rights and independently documented limitations. Performance conclusions and an updated abstract must follow the complete experiment—not precede it.
 
-The counted differences for B3/P are **explicit STALE** output statuses at deferred evaluations rather than silently incorrect reuse. No output marked VALID violated its declared source-age bound in this fixture. B0/B1/B2 had zero status or numerical differences at matched source cuts. B1 was not faster on this cheap analytic workload; P's modeled 8,000,000-unit compute budget resulted in **no reduction in total compute invocations relative to B2**, while deferring additional outputs. These mixed findings are reasons to revise the workload, calibrate scheduling costs and evaluate whether P has a useful operating regime; they do not establish an improvement claim. CPU/clock contention, observed market traces, calibration, sustained throughput, confidence intervals and failure-recovery distributions remain unresolved. A small **exploratory** three-repeat budget sweep (4/6/8/10/12/16 million nominal units) is separately available through `benchmarks/run_budget_sweep.py`; at 4 million, P attempted fewer computations than B2 while losing many more currently valid results; at 16 million, the same fixture yielded matching status counts. These are feasibility observations, not a documented beneficial operating regime. Exact raw files for this build are packaged separately with the prototype; regenerate using the documented command.
+## VII. Discussion: What This Continuation Adds
 
-## 6. Remaining experimental study (not completed)
+The earlier ASEP2 accomplishment was integration of a broad, explainable research terminal on local infrastructure. MetalArch deepens its original efficiency requirement from an implementation consideration into an explicit systems research problem: what to execute, when a result can be safely reused, and how to represent useful-but-old evidence when the budget is exceeded. It supplies a testable native reference and reproducibility machinery to examine the issue rather than merely renaming the interface or announcing faster numerical kernels. The study also identifies when optimization **does not** pay off—particularly thread overhead on inexpensive stages and preliminary P-policy deferrals without corresponding work savings. Those negative findings are relevant constraints on the eventual design.
 
-A publication-ready study should establish observed trace semantics and rights, artifact-level environment pinning, controlled cross-platform latency and worker-pool calibration, observed-trace validation, systematic budget/deadline sweeps, and a second scheduling algorithm or ablation to justify the present P policy. Every policy must use identical recorded inputs and aligned evaluation cuts. Workload dimensions should vary event arrival rate, symbol count, engine cost, worker count, freshness deadline, and resource budget. The measurements required are event-to-output latency distributions, per-engine source/result age, deadline violation rate, sustained throughput, CPU time, memory, queue lengths/drops, scheduling overhead and numerical/decision disagreement against B0. Experiments must include baseline ablations, failures, out-of-order/duplicate events, source disconnects and repeated runs with uncertainty summaries. A performance claim is defensible only if supported by the raw output and code revision.
+The current limits are substantial: the representative stage set is smaller than ASEP2's historical analytical scope; the previous data/UI integration is not complete; cost estimates in P are nominal; CPU/memory limits have not been enforced in the reported study; event-recording fixtures do not recreate every live market-feed semantic; and no market-prediction or patentability claim is established. The extension's empirical strength depends on addressing these limits with fairly matched runs.
 
-## 7. Threats to validity and limits
+## VIII. Conclusion — provisional
 
-This prototype currently processes deterministic **synthetic** streams, not independently verified venue data. It has eleven declared functions, not the original ASEP2 engine inventory. A fast digest is not collision-resistant proof. The default history is finite; EMA initialization uses the earliest retained value. A five-policy synthetic diagnostic has been performed in a shared container with uncontrolled resource contention, and the initial P policy did not reduce compute invocations relative to B2 at the tested budget. No external-source failure recovery, actual queue/backpressure implementation, real-time deadline scheduling, macOS/Apple Silicon verification, or validated predictive performance has been shown. Before journal/conference submission, the authors must verify paper citations and source rights, report failures and negative evidence honestly, and confirm manuscript contributions and affiliations.
+Building on ASEP2 Metals Terminal's multi-engine financial research framework, MetalArch has established an initial C++20 implementation for studying dependency-correct execution, selective recomputation, disclosed freshness, and deterministic replay in a resource-constrained local setting. The synthetic tests support internal contract checks and reference agreement for the non-deferred policies. They do not yet establish superiority of the preliminary freshness scheduler. The final paper will retain the previous semester's application motivation and credited engineering foundation, but its new quantitative claims will be confined to reproducible Phase II experiments.
 
-## 8. Conclusion — provisional
+## Manuscript and artifact provenance
 
-A constrained C++20 reference implementation and validation fixtures are available for studying the relationship between dependency correctness, provenance, cache reuse and replay. An initial scheduler has been implemented, but its comparative value remains an open research question; the synthetic diagnostic includes negative findings. This paper's final claims, title and abstract must be revised after fair baseline comparisons and a systematic related-work evaluation.
-
-## Artifact availability
-
-Working draft implementation: `parthdongre/MetalArch`, branch `impl/native-reference`, draft PR #1 at the time of writing. Source files, CMake/CTest suite, CI definition, synthetic fixture generator, MA1 example trace, five-policy diagnostic and sensitivity scripts, implementation audit and experiment summaries are included; full raw local CSV is distributed separately in the source-and-results ZIP. The original ASEP2 repository and historical manuscript are separate from this codebase.
-
-## Related work to verify before final reference list
-
-- Arasu et al., *Linear Road: A Stream Data Management Benchmark* (VLDB 2004), primary PDF: https://www.vldb.org/conf/2004/RS12P1.PDF
-- Miao et al., *StreamBox: Modern Stream Processing on a Multicore Machine* (USENIX ATC 2017): https://www.usenix.org/conference/atc17/technical-sessions/presentation/miao
-- *Benchmarking Distributed Stream Data Processing Systems* (arXiv:1802.08496), investigate methods and limits before citation: https://arxiv.org/abs/1802.08496
-- ACM Artifact Review and Badging: https://www.acm.org/publications/policies/artifact-review-and-badging-current
-
-A systematic comparison of incremental stream computation, provenance and freshness scheduling is still required. No claim that these works establish a unique MetalArch novelty gap is made.
+- Original untouched paper: `paper/legacy/IEEE_RESEARCH_PAPER.md` and `paper/legacy/IEEE_RESEARCH_PAPER.tex` (June 2026; imported from user's handed-off local archive, **not** the connected ASEP2 GitHub `main` revision).
+- Historical-source audit: `docs/LEGACY_AUDIT.md`.
+- Previous standalone MetalArch methods draft: `paper/METALARCH_SYSTEMS_DRAFT_2026-10-02.md` (retained as an intermediate working version).
+- New Phase II native source, fixture and experiments: implementation branch `impl/native-reference`, PR #1; relevant CMake, `src/`, `include/`, `tests/`, `benchmarks/` paths.
+- Existing legacy bibliography is preserved verbatim in the archived manuscript. A unified IEEE-format bibliography requires source and relevance verification before submission. Do not simply copy citations to support new scheduling/novelty claims.
