@@ -1,49 +1,60 @@
 # MetalArch
 
-**Research prototype (C++20).** An independently implemented analytical execution core using synthetic precious-metal workloads. This is **not** the original ASEP2 terminal, a validated prediction model, a production market feed, a verified patent, or a completed research paper.
+**Research prototype: C++20 dependency-aware streaming analytics core.** It is a new implementation, not a rename of ASEP2, a production brokerage system, a validated forecasting model, an established patent, or a completed publication.
 
-## Implemented in this snapshot
+## Implemented execution modes
 
-- Standard-library C++20 core with strict DAG validation (missing dependencies, cycles, duplicate identifiers); ready nodes are executed deterministically in topological order. **No parallel executor is claimed yet.**
-- Enforced per-engine source read declarations; downstream engines receive only their declared upstream results.
-- Bounded per-stream histories (default 4096 records), version and rolling source-content digests, idempotent latest-sequence duplicates, explicit rejection of divergent duplicates, invalid and out-of-order events.
-- Per-session state and last-valid-result cache keys using engine ID, revision, parameters, source key/version/digest, declared upstream identities/status and declared age policy. Cache reuse checks age; stale/unavailable/failed results are never converted to valid neutral scores.
-- Input provenance modes (observed, estimated, simulated), source/event timestamps, execution-session clock inputs, source lineage, explicit result states.
-- Versioned text event codec (`MA1`) and replay CLI using the same execution code path as normal sessions. Reproducibility is currently verified on the **same machine/build**; distributed or cross-platform bitwise determinism is not claimed.
-- Eleven audited-by-implementation workload stages: EMA(8,21) trend, RSI(14), RMS log-return volatility(20), ATR(14) simple average, timestamp-matched Pearson peer correlation, top-of-book imbalance, 64-observation Goertzel spectral concentration (eight bins), and deterministic illustrative regime/risk/forecast/fusion. These final four are heuristic engineering fixtures, **not empirical financial models**.
-- Release-mode tests, optional ASan/UBSan, standalone B0 sequential-full versus B2 cache smoke benchmark.
+| Policy | Behaviour |
+|---|---|
+| B0 | Correct sequential uncached full recomputation — reference/oracle |
+| B1 | Declared-DAG wave executor with persistent bounded worker pool; cheap waves execute serially to avoid excessive overhead |
+| B2 | Per-session source-version/parent-version cache with independent input/result age contracts |
+| B3 | Correct fixed cadence and separately disclosed last-known output when deferred |
+| P | Preliminary deadline-slack, dependency-closure, declared-cost-budget ready queue; research value still unverified |
 
-## Build and test
+A typed `Descriptor` declares inputs, required parents, revision, parameters, source age, result age, cadence and nominal compute estimate. Missing dependencies, cycles and inconsistent descriptors fail early. Input keys include source, symbol, timeframe and kind. The ingestion store rejects non-finite/invalid events, sequence/time inversions, conflicting duplicates and invalid provenance modes, retains bounded history through an O(1)-overwrite contiguous ring (default 4,096 events/stream), and exposes versioned rolling-content identity. Engines can read only declared sources. Downstream failures and provenance propagate explicitly. The source fingerprint uses a fast **non-cryptographic** digest; the manifest separately uses SHA-256 for artifact integrity. Ingest and evaluation must be serialized within one Session.
+
+**Eleven initial stages:** EMA trend, Wilder RSI, realized RMS volatility, ATR, timestamp-matched Pearson correlation, top-of-book imbalance, Goertzel spectral concentration, and illustrative regime, risk, forecast and fusion. The last four are *heuristic test stages*, not validated predictions or probability estimates. Source modes are OBSERVED/ESTIMATED/SIMULATED; generated fixture data are exclusively SIMULATED.
+
+## Build and verify
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ./build/metalarch_tests
-./build/metalarch_bench
 
-# On a supported Clang/GCC toolchain:
+# GCC/Clang sanitizer configuration
 cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DMETALARCH_SANITIZE=ON
 cmake --build build-sanitize --parallel
 ctest --test-dir build-sanitize --output-on-failure
-
-# Purely synthetic, deterministic trace:
-python3 fixtures/make_fixture.py
-./build/metalarch_cli replay fixtures/synthetic_70.ma1 > replay.txt
 ```
 
-CMake >=3.20 and an available C++20 compiler are required. No external C++ dependencies. Python is needed only to regenerate the optional deterministic fixture, not for runtime analytics. Linux/GCC 14 test results are available; **macOS/Apple Silicon is not yet independently verified.**
+CTest covers the native assertions, a real trace replay and all five policy smoke executions. The implementation has also been tested with GCC Release, GCC ASan/UBSan, and Clang Release locally. The GitHub workflow separately tests Ubuntu with GCC/Clang and macOS AppleClang; check workflow results rather than assuming remote cross-platform success.
 
-## Trace schema
+## Deterministic replay
 
-`MA1|B or L|source|symbol|timeframe|sequence|event_ns|ingest_ns|a|b|c|d|e|mode`
+MA1 schema: `MA1|B or L|source|symbol|timeframe|seq|event_ns|ingest_ns|a|b|c|d|e|mode`.
+`B`: open/high/low/close/volume; `L`: bid/ask/bid_qty/ask_qty/reserved. Mode `0/1/2` is observed/estimated/simulated. This minimal schema does not reproduce full live exchange order-book delta semantics. Global ingestion timestamps must be non-decreasing. Source age and result computation age are distinct. Deferred outputs carry optional prior metadata but never pass its old value to a required downstream engine as VALID.
 
-`B`: a=open, b=high, c=low, d=close, e=volume. `L`: a=bid, b=ask, c=bid quantity, d=ask quantity, e=reserved. Mode is 0 observed / 1 estimated / 2 simulated. Fields are pipe-separated; source keys cannot contain pipes/newlines. Malformed, out-of-order and conflicting duplicate records are rejected. The rolling FNV-style digest is a fast non-cryptographic **cache identity aid**, not an authenticity mechanism; use an external SHA-256 manifest for trace integrity. Latency measurements must distinguish event and ingestion time. The current schema does not claim lossless capture of a live exchange depth feed.
+```bash
+python3 fixtures/make_fixture.py --bars 70 --output fixtures/synthetic_70.ma1
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 b2 > cached.txt
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 b3 > cadence.txt
+./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > scheduled.txt
+```
 
-## Research and migration integrity
+CLI policies: `b0`, `b1`, `b2` (default), `b3`, `p`. Replay uses the same execution implementations as interactive sessions with a controlled input clock, not a reconstruction of engine-score telemetry. Exact same-platform replay is tested; cross-platform bitwise agreement is not guaranteed.
 
-Original ASEP2 is separately preserved; none of its unreviewed components, datasets or publication metrics is automatically imported. Historical paper author list: Ramakrishna Bharsakde, Parth Dongre, Parth Birari, Atharv Patil, Aryan Patil (confirm revisions and contributor agreements before publication). The old ASEP2 paper's engine counts and tests must not be advertised as MetalArch outcomes. Synthetic benchmark timings here are preliminary diagnostics, **not** a paper-ready comparison.
+## Five-policy diagnostic benchmark
 
-See `docs/ENGINE_AUDIT.md`, `docs/BENCHMARK_NOTES.md`, `docs/PAPER_SCAFFOLD.md` and the repository's prior planning files for the future research work. In particular, B1 parallel, B3 cadence, and freshness scheduling policy P, immutable append-only trace storage, external macro feed validation, artifact locking and full evaluation are still future work.
+```bash
+python3 benchmarks/run_study.py --bars 300 --runs 10 --warmup-bars 65 \
+  --budget-ns 8000000 --outdir artifacts/diagnostic_300_10
+```
 
-**Patent/publication caution:** Public disclosure may impair patent eligibility in some jurisdictions. This repository contains conventional reference-system work, not a vetted patent claim. Obtain qualified advice and conduct prior-art searches before publicly publishing any genuinely new confidential scheduling mechanism.
+Output: `events.csv`, `summary.json`, `manifest.json`, `per_run.txt` and a SHA-256-labelled synthetic trace. Benchmark accepts the documented *fixture* XAU/XAG bars and book, not arbitrary claimed observational feeds. Modeled cost budget is based on declared initial cost estimates rather than measured/guaranteed actual CPU runtime. The first extended diagnostic found B0/B1/B2 status and numerical agreement with zero unflagged source-age violation. B1 did not outperform B0 on this lightweight workload; P deferred additional outputs without reducing compute invocations versus B2 for the tested budget. See `docs/BENCHMARK_NOTES.md` and `docs/IMPLEMENTATION_PHASE2.md` for numbers and caveats. **These are not publication-ready financial-data or real-time scheduling results.**
+
+## Research integrity and history
+
+Original ASEP2 historical paper authors (original order, subject to contribution/affiliation confirmation for a revision): Ramakrishna Bharsakde, Parth Dongre, Parth Birari, Atharv Patil, Aryan Patil. Historical counts and claims belong to their exact prior revision. Do not silently reuse external data or original code without rights and provenance review. See `docs/LEGACY_AUDIT.md`, `paper/METALARCH_DRAFT.md`, and `docs/ACCEPTANCE.md`. Novelty, patent eligibility, predictive performance, observed-source coverage, and peer-reviewed publication remain **unverified**. Public disclosure can affect patent strategy; any confidential inventive claim requires qualified prior-art/filing review before publication.

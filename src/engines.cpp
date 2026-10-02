@@ -9,8 +9,8 @@ namespace ma {
 namespace {
 Result ready(double v){Result r;r.status=Status::Valid;r.value=v;return r;}
 Result missing(const char* why){Result r;r.reason=why;return r;}
-const std::vector<Event>& bars(const ReadView& s,const Key& k){auto p=s.get(k);if(!p)throw std::runtime_error("missing source");return p->events;}
-double ema(const std::vector<Event>& v, size_t n){
+const EventWindow& bars(const ReadView& s,const Key& k){auto p=s.get(k);if(!p)throw std::runtime_error("missing source");return p->events;}
+double ema(const EventWindow& v, size_t n){
  if(v.empty())throw std::runtime_error("empty EMA input");
  const double alpha=2.0/(static_cast<double>(n)+1.0);
  double acc=v.front().d;for(size_t i=1;i<v.size();++i)acc=alpha*v[i].d+(1.0-alpha)*acc;return acc;
@@ -95,6 +95,12 @@ Graph make_metal_graph(const Key& primary,const Key& peer,const Key& book){
    // Engineering workload only. No calibrated signal or investment advice implied.
    return ready(0.3*val(r,"regime")-0.2*val(r,"risk")+0.2*val(r,"forecast")+0.2*val(r,"peer_corr")+0.1*val(r,"book_imbalance"));
  }});
+ // A deliberately slower spectral workload exercises both scheduling policies.
+ for(auto& engine:d) {
+   if(engine.id=="spectral") {engine.cadence=4;engine.estimated_cost_ns=4'000'000;}
+   else if(engine.id=="peer_corr") engine.estimated_cost_ns=2'000'000;
+   else if(engine.id=="fusion") engine.estimated_cost_ns=1'000'000;
+ }
  return Graph(std::move(d));
 }
 }

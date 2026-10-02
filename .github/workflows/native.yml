@@ -4,18 +4,42 @@ on:
   pull_request:
 jobs:
   cpp20:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            compiler: g++
+            sanitize: true
+          - os: ubuntu-latest
+            compiler: clang++
+            sanitize: true
+          - os: macos-latest
+            compiler: clang++
+            sanitize: false
+    runs-on: ${{ matrix.os }}
+    env:
+      CXX: ${{ matrix.compiler }}
     steps:
       - uses: actions/checkout@v4
       - name: Configure release
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build --parallel 2
-      - name: Run tests
+      - name: Test native core, policy comparison and replay
         run: ctest --test-dir build --output-on-failure
+      - name: Repeated deterministic scheduler replay
+        shell: bash
+        run: |
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > first.txt
+          ./build/metalarch_cli replay fixtures/synthetic_70.ma1 p 8000000 > second.txt
+          cmp first.txt second.txt
       - name: Configure sanitizers
+        if: matrix.sanitize
         run: cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug -DMETALARCH_SANITIZE=ON
       - name: Build sanitizer tests
+        if: matrix.sanitize
         run: cmake --build build-sanitize --parallel 2
       - name: Run sanitizer tests
+        if: matrix.sanitize
         run: ctest --test-dir build-sanitize --output-on-failure

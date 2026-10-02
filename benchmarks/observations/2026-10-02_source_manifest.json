@@ -1,0 +1,59 @@
+{
+  "kind": "LOCAL_SYNTHETIC_DIAGNOSTIC_NOT_PUBLICATION_FINDING",
+  "timestamp_utc": "2026-10-02T02:27:26.559823+00:00",
+  "git_head": "source snapshot before implementation-branch commit; see PR commit for provenance",
+  "git_dirty": "unavailable",
+  "source_sha256": {
+    "CMakeLists.txt": "c61a1a15f93d5c086c501f5645c6fed142d0ce162c3c590d7550c18dd4bdcc50",
+    "include/metalarch/core.hpp": "6dfd25990ebe7789cf953077a6da25a3ef2d0990450362d9d2048cf9a27f65a3",
+    "include/metalarch/engines.hpp": "6d6ed55613ada56b52937f97bd6a71289889ab96d78eff9c363b77dcd74af64c",
+    "src/core.cpp": "98ef55ef67891d6c3e224bc9a55b2bd91b96a1aaab4717f1129d5c14b1ab48e1",
+    "src/engines.cpp": "ceaa8740ad7d12a174969742b1029eb5995136fbc07d80d4b2360529cba01c21",
+    "src/main.cpp": "7f621df2bfee79f3c1e1a161386cd49268bfeb430cf8e161c756264c78a46c3c",
+    "benchmarks/compare.cpp": "666e3bf96f2201307c7f2ee96e965a317c1efad54059771f465b181c2c31958a",
+    "benchmarks/bench.cpp": "da3b952784305b37ed522316baf2c98a7cfcb1abd4e38132e6031a06d4e5632a",
+    "fixtures/make_fixture.py": "9af5f72b178bf4550481679a979620101b368c423236dc6eff840c080debc7c5",
+    "tests/test_core.cpp": "88e40e3f104a1a5263fbaba823492817324c1350fced93884c1a2ceb3d6d0cdf"
+  },
+  "trace_path": "synthetic_300.ma1 (generated using fixtures/make_fixture.py)",
+  "trace_sha256": "d171a78b429ea06d6bd488e01bd62e8bb49bfc686ef4668d47dad05fd0978f1d",
+  "csv_sha256": "139838863e414738f507cf6e109d3d1a2d7c2e05f39804337601bd01636f3635",
+  "binary_sha256": "98c3fef710ebe446ffeeb74a3e7f9982f3b88c526f67ae4f4a027a57b5addc33",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "cpu": "",
+  "cpu_count": 5,
+  "python": "3.13.5",
+  "cxx_version": "c++ (Debian 14.2.0-19) 14.2.0",
+  "cmake_version": "cmake version 3.31.6",
+  "policies": [
+    "B0_full",
+    "B1_parallel",
+    "B2_cache",
+    "B3_cadence",
+    "P_freshness"
+  ],
+  "assumptions": [
+    "source mode SIMULATED for generated trace",
+    "local ingestion plus execution only; no network latency",
+    "no CPU pinning, frequency or thermal control",
+    "P uses declared initial estimated costs, not empirical calibrated service times",
+    "reference checked per event for correctness baselines"
+  ],
+  "command": [
+    "python3",
+    "benchmarks/run_study.py",
+    "--bars",
+    "300",
+    "--runs",
+    "10",
+    "--warmup-bars",
+    "65",
+    "--budget-ns",
+    "8000000",
+    "--outdir",
+    "artifacts/diagnostic_300_10"
+  ],
+  "warmup_bars": 65,
+  "runs": 10,
+  "budget_nominal_ns": 8000000
+}
